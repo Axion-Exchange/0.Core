@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kycStatus      KYCState     @default(PENDING)
+  frozen         Boolean      @default(false)
+  role           Role         @default(CLIENT)
+  fiatLedger     FiatLedger[]
+  auditLogs      AuditLog[]   // Strict traceability
+  createdAt      DateTime     @default(now())
+}
+
+model FiatLedger {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @db.Uuid
+  currency       String    @db.VarChar(3) // e.g. "EUR"
+  balance        Decimal   @db.Decimal(24, 8) // Precision institutional finance
+  lockedInEscrow Decimal   @db.Decimal(24, 8)
+  owner          User      @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id             Int       @id @default(autoincrement())
+  adminId        String    @db.Uuid
+  action         String
+  ipAddress      String
+  targetId       String
+  timestamp      DateTime  @default(now())
+}
+
+enum KYCState {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum Role {
+  CLIENT
+  ADMIN
+  SUPER_ADMIN
+}
