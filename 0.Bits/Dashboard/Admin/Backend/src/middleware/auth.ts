@@ -1,43 +1,71 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { config } from '../config/index.js';
+import { prisma } from '../lib/db.js';
+import { sendError } from '../lib/response.js';
+import type { JwtPayload } from '../types/index.js';
+import type { Role } from '@prisma/client';
 
-// Strict environment variable typing
-const JWT_SECRET = process.env.JWT_SECRET || 'institutional-fallback-secret-rotation-required';
-
-interface JwtPayload {
-  userId: string;
-  role: 'CLIENT' | 'ADMIN' | 'SUPER_ADMIN';
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JwtPayload;
-    }
-  }
-}
-
-export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+/**
+ * Middleware: Verify JWT bearer token and attach admin context.
+ */
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
+
   if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or malformed Authorization header' });
+    sendError(res, 401, 'AUTH_MISSING', 'Authorization header required (Bearer <token>)');
+    return;
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.slice(7);
+
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    req.user = decoded;
+    const decoded = jwt.verify(token, config.JWT_SECRET) as JwtPayload;
+    req.admin = decoded;
     next();
-  } catch (error) {
-    return res.status(403).json({ error: 'Cryptographic signature invalid or token expired' });
+  } catch (err: unknown) {
+    const message = err instanceof jwt.TokenExpiredError
+      ? 'Token expired — please re-authenticate'
+      : 'Invalid or malformed token';
+    sendError(res, 401, 'AUTH_INVALID', message);
   }
-};
+}
 
-export const requireRole = (allowedRoles: JwtPayload['role'][]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Insufficient institutional clearance (RBAC rejection)' });
+/**
+ * Middleware: Require specific admin roles (RBAC guard).
+ * Must be used AFTER requireAuth.
+ */
+export function requireRole(...allowedRoles: Role[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.admin) {
+      sendError(res, 401, 'AUTH_MISSING', 'Authentication required');
+      return;
     }
+
+    if (!allowedRoles.includes(req.admin.role)) {
+      sendError(res, 403, 'FORBIDDEN', `Insufficient permissions. Required: ${allowedRoles.join(' | ')}`);
+      return;
+    }
+
     next();
   };
-};
+}
+
+/**
+ * Optional auth: attach admin context if token present, but don't block.
+ */
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.slice(7);
+      const decoded = jwt.verify(token, config.JWT_SECRET) as JwtPayload;
+      req.admin = decoded;
+    } catch {
+      // Token invalid — proceed without auth context
+    }
+  }
+
+  next();
+}

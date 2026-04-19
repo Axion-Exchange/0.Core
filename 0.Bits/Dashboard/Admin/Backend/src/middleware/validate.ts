@@ -1,20 +1,58 @@
-import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import type { Request, Response, NextFunction } from 'express';
+import { ZodSchema, ZodError } from 'zod';
+import { sendError } from '../lib/response.js';
 
-export const validate = (schema: AnyZodObject) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await schema.parseAsync({
-        body: req.body,
-        query: req.query,
-        params: req.params,
-      });
-      return next();
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return res.status(400).json({ error: 'Payload validation failed', details: error.errors });
-      }
-      return res.status(400).json({ error: 'Internal validation error' });
+/**
+ * Validate request body against a Zod schema.
+ */
+export function validateBody(schema: ZodSchema) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      const details = formatZodError(result.error);
+      sendError(res, 400, 'VALIDATION_ERROR', 'Request body validation failed', details);
+      return;
     }
+    req.body = result.data;
+    next();
   };
-};
+}
+
+/**
+ * Validate request query parameters against a Zod schema.
+ */
+export function validateQuery(schema: ZodSchema) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const details = formatZodError(result.error);
+      sendError(res, 400, 'VALIDATION_ERROR', 'Query parameter validation failed', details);
+      return;
+    }
+    // Attach validated query back (with coerced types)
+    (req as any).query = result.data;
+    next();
+  };
+}
+
+/**
+ * Validate request path parameters against a Zod schema.
+ */
+export function validateParams(schema: ZodSchema) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.params);
+    if (!result.success) {
+      const details = formatZodError(result.error);
+      sendError(res, 400, 'VALIDATION_ERROR', 'Path parameter validation failed', details);
+      return;
+    }
+    next();
+  };
+}
+
+function formatZodError(error: ZodError): Array<{ field: string; message: string }> {
+  return error.issues.map((issue) => ({
+    field: issue.path.join('.'),
+    message: issue.message,
+  }));
+}

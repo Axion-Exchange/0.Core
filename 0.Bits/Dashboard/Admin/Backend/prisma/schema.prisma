@@ -1,48 +1,623 @@
+// ============================================================================
+// 0.Bits Institutional Exchange — Prisma Schema
+// ============================================================================
+// PostgreSQL database powering the admin dashboard API.
+// Models are organized by domain: Identity, P2P, Treasury, Operations, Compliance.
+// ============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-model User {
-  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  kycStatus      KYCState     @default(PENDING)
-  frozen         Boolean      @default(false)
-  role           Role         @default(CLIENT)
-  fiatLedger     FiatLedger[]
-  auditLogs      AuditLog[]   // Strict traceability
-  createdAt      DateTime     @default(now())
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  ENUMS                                                                   │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+enum Role {
+  VIEWER
+  ANALYST
+  ADMIN
+  SUPER_ADMIN
 }
 
-model FiatLedger {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String    @db.Uuid
-  currency       String    @db.VarChar(3) // e.g. "EUR"
-  balance        Decimal   @db.Decimal(24, 8) // Precision institutional finance
-  lockedInEscrow Decimal   @db.Decimal(24, 8)
-  owner          User      @relation(fields: [userId], references: [id])
-}
-
-model AuditLog {
-  id             Int       @id @default(autoincrement())
-  adminId        String    @db.Uuid
-  action         String
-  ipAddress      String
-  targetId       String
-  timestamp      DateTime  @default(now())
-}
-
-enum KYCState {
+enum KYCStatus {
+  NOT_STARTED
   PENDING
-  VERIFIED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum KYBStatus {
+  NOT_STARTED
+  PENDING
+  IN_REVIEW
+  APPROVED
   REJECTED
 }
 
-enum Role {
-  CLIENT
-  ADMIN
-  SUPER_ADMIN
+enum AdType {
+  BUY
+  SELL
+}
+
+enum AdStatus {
+  ACTIVE
+  PAUSED
+  DEPLETED
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING_FIAT
+  FIAT_RECEIVED
+  PENDING_RELEASE
+  RELEASED
+  COMPLETED
+  CANCELLED
+  APPEALING
+  DISPUTE_RESOLVED
+  EXPIRED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  EVIDENCE_REQUESTED
+  RESOLVED_BUYER
+  RESOLVED_SELLER
+  ESCALATED
+  CLOSED
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  TRANSFER_IN
+  TRANSFER_OUT
+  CONVERSION
+  FEE
+  ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REVERSED
+}
+
+enum NodeStatus {
+  ONLINE
+  DEGRADED
+  OFFLINE
+  MAINTENANCE
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+  FATAL
+}
+
+enum NotificationType {
+  ORDER
+  DISPUTE
+  KYC
+  SYSTEM
+  TREASURY
+  SECURITY
+}
+
+enum PaymentMethodType {
+  BANK_TRANSFER
+  PIX
+  PSE
+  SPEI
+  MOBILE_MONEY
+  CARD
+  CRYPTO_WALLET
+}
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  IDENTITY & AUTH                                                         │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+/// Admin dashboard operators. These are the internal team members.
+model Admin {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String    @unique
+  passwordHash  String
+  displayName   String
+  role          Role      @default(ANALYST)
+  avatarUrl     String?
+  mfaEnabled    Boolean   @default(false)
+  mfaSecret     String?
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+  failedLogins  Int       @default(0)
+  lockedUntil   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  assignedDisputes P2PDispute[] @relation("DisputeAssignee")
+  reviewedDocuments UserDocument[] @relation("DocumentReviewer")
+
+  @@index([email])
+  @@map("admins")
+}
+
+/// JWT session tracking for token revocation and audit.
+model Session {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId     String    @db.Uuid
+  tokenHash   String    @unique
+  ipAddress   String
+  userAgent   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  admin       Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([tokenHash])
+  @@map("sessions")
+}
+
+/// End-users, counterparties, and clients of the exchange.
+model User {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  externalId      String?   @unique  // Binance UID, etc.
+  email           String?   @unique
+  phone           String?
+  displayName     String
+  legalName       String?
+  country         String?   @db.VarChar(3) // ISO 3166-1 alpha-3
+  kycStatus       KYCStatus @default(NOT_STARTED)
+  kybStatus       KYBStatus @default(NOT_STARTED)
+  riskScore       Int       @default(0) // 0-100
+  isFrozen        Boolean   @default(false)
+  isBlocked       Boolean   @default(false)
+  blockedReason   String?
+  totalVolume     Decimal   @default(0) @db.Decimal(24, 8)
+  totalTrades     Int       @default(0)
+  notes           String?
+  metadata        Json?     // Flexible key-value store
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  documents       UserDocument[]
+  orders          P2POrder[]     @relation("OrderUser")
+  disputes        P2PDispute[]   @relation("DisputeUser")
+  transactions    Transaction[]
+  fiatLedgers     FiatLedger[]
+
+  @@index([email])
+  @@index([externalId])
+  @@index([kycStatus])
+  @@index([isBlocked])
+  @@map("users")
+}
+
+/// KYC/KYB document submissions attached to users.
+model UserDocument {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @db.Uuid
+  documentType       String    // passport, drivers_license, utility_bill, incorporation_cert, etc.
+  fileUrl            String
+  fileName           String?
+  fileSizeBytes      Int?
+  mimeType           String?
+  verificationStatus KYCStatus @default(PENDING)
+  rejectionReason    String?
+  reviewedById       String?   @db.Uuid
+  reviewedAt         DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy         Admin?    @relation("DocumentReviewer", fields: [reviewedById], references: [id])
+
+  @@index([userId])
+  @@index([verificationStatus])
+  @@map("user_documents")
+}
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  P2P MODULE                                                              │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+/// Merchant exchange accounts (Binance, Bitget, etc.)
+model P2PAccount {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  exchange      String    // binance, bitget, bybit
+  label         String    // "Binance EUR Main", etc.
+  apiKeyEnc     String    // AES-256-GCM encrypted
+  apiSecretEnc  String    // AES-256-GCM encrypted
+  passphraseEnc String?   // For exchanges requiring passphrase
+  region        String?   @db.VarChar(10) // EU, LATAM, APAC, etc.
+  isActive      Boolean   @default(true)
+  lastSyncAt    DateTime?
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  advertisements P2PAdvertisement[]
+  wallets        CryptoWallet[]
+
+  @@unique([exchange, label])
+  @@map("p2p_accounts")
+}
+
+/// P2P advertisements (market maker spread offerings).
+model P2PAdvertisement {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId     String    @db.Uuid
+  externalAdId  String?   @unique  // Exchange-side ad ID
+  asset         String    @db.VarChar(10) // USDT, BTC, ETH, etc.
+  fiat          String    @db.VarChar(10) // EUR, BRL, COP, MXN, NGN
+  type          AdType
+  price         Decimal   @db.Decimal(24, 8)
+  marginPercent Decimal   @db.Decimal(8, 4)
+  minLimit      Decimal   @db.Decimal(24, 2)
+  maxLimit      Decimal   @db.Decimal(24, 2)
+  availableQty  Decimal   @default(0) @db.Decimal(24, 8)
+  status        AdStatus  @default(ACTIVE)
+  autoReply     String?
+  remarks       String?
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  account       P2PAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  orders        P2POrder[]
+
+  @@index([accountId])
+  @@index([asset, fiat])
+  @@index([status])
+  @@map("p2p_advertisements")
+}
+
+/// P2P order lifecycle tracking.
+model P2POrder {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  externalOrderId  String?     @unique // Exchange-side order ID
+  advertisementId  String?     @db.Uuid
+  userId           String?     @db.Uuid
+  asset            String      @db.VarChar(10)
+  amount           Decimal     @db.Decimal(24, 8)
+  fiat             String      @db.VarChar(10)
+  fiatAmount       Decimal     @db.Decimal(24, 2)
+  price            Decimal     @db.Decimal(24, 8) // Execution price
+  fee              Decimal     @default(0) @db.Decimal(24, 8)
+  type             AdType      // BUY or SELL from merchant perspective
+  counterparty     String?     // Counterparty nickname
+  status           OrderStatus @default(PENDING_FIAT)
+  paymentMethod    String?     // bank_transfer, pix, etc.
+  paymentRef       String?     // Bank reference number
+  releaseDeadline  DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  cancelReason     String?
+  metadata         Json?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  advertisement    P2PAdvertisement? @relation(fields: [advertisementId], references: [id])
+  user             User?             @relation("OrderUser", fields: [userId], references: [id])
+  disputes         P2PDispute[]
+
+  @@index([advertisementId])
+  @@index([userId])
+  @@index([status])
+  @@index([externalOrderId])
+  @@index([createdAt])
+  @@map("p2p_orders")
+}
+
+/// Dispute/appeal tracking for contested orders.
+model P2PDispute {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String        @db.Uuid
+  userId          String?       @db.Uuid
+  filedBy         String        // counterparty name or admin
+  reason          String
+  description     String?
+  evidenceUrls    String[]      // Array of evidence file URLs
+  status          DisputeStatus @default(OPEN)
+  resolution      String?
+  resolvedInFavor String?       // "buyer" | "seller"
+  assignedToId    String?       @db.Uuid
+  escalatedAt     DateTime?
+  resolvedAt      DateTime?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  order           P2POrder      @relation(fields: [orderId], references: [id])
+  user            User?         @relation("DisputeUser", fields: [userId], references: [id])
+  assignedTo      Admin?        @relation("DisputeAssignee", fields: [assignedToId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+  @@map("p2p_disputes")
+}
+
+/// Fiat payment methods (bank accounts, mobile money, etc.)
+model PaymentMethod {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label           String            // "Revolut EUR", "Wise GBP", etc.
+  type            PaymentMethodType @default(BANK_TRANSFER)
+  bankName        String?
+  accountName     String?
+  accountNumber   String?           // Encrypted at application layer
+  routingNumber   String?
+  swiftCode       String?
+  currency        String            @db.VarChar(3)
+  country         String?           @db.VarChar(3)
+  region          String?           @db.VarChar(10)
+  isActive        Boolean           @default(true)
+  isPrimary       Boolean           @default(false)
+  dailyLimit      Decimal?          @db.Decimal(24, 2)
+  monthlyLimit    Decimal?          @db.Decimal(24, 2)
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([currency])
+  @@index([isActive])
+  @@map("payment_methods")
+}
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  TREASURY MODULE                                                         │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+/// Aggregated portfolio NAV per currency.
+model Portfolio {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  currency         String    @unique @db.VarChar(10) // EUR, USD, BRL, COP, MXN, USDT, BTC
+  totalBalance     Decimal   @default(0) @db.Decimal(24, 8)
+  availableBalance Decimal   @default(0) @db.Decimal(24, 8)
+  lockedBalance    Decimal   @default(0) @db.Decimal(24, 8)
+  pendingBalance   Decimal   @default(0) @db.Decimal(24, 8)
+  lastSyncAt       DateTime?
+  updatedAt        DateTime  @updatedAt
+
+  snapshots        BalanceSnapshot[]
+
+  @@map("portfolios")
+}
+
+/// Individual fiat currency ledger entries.
+model FiatLedger {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String?   @db.Uuid
+  currency       String    @db.VarChar(3)
+  balance        Decimal   @db.Decimal(24, 8)
+  lockedInEscrow Decimal   @default(0) @db.Decimal(24, 8)
+  source         String?   // "januar", "facilitapay", etc.
+  lastSyncAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  owner          User?     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([currency])
+  @@map("fiat_ledgers")
+}
+
+/// Exchange crypto wallet balances.
+model CryptoWallet {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId      String    @db.Uuid
+  asset          String    @db.VarChar(10) // USDT, BTC, ETH, SOL
+  spotBalance    Decimal   @default(0) @db.Decimal(24, 8)
+  fundingBalance Decimal   @default(0) @db.Decimal(24, 8)
+  lockedBalance  Decimal   @default(0) @db.Decimal(24, 8)
+  totalUsd       Decimal   @default(0) @db.Decimal(24, 2)
+  lastSyncAt     DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  account        P2PAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, asset])
+  @@index([accountId])
+  @@map("crypto_wallets")
+}
+
+/// Historical balance time-series for portfolio charts.
+model BalanceSnapshot {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  portfolioId String    @db.Uuid
+  balance     Decimal   @db.Decimal(24, 8)
+  balanceUsd  Decimal?  @db.Decimal(24, 2) // Normalized USD value at snapshot time
+  source      String?   // What triggered the snapshot
+  createdAt   DateTime  @default(now())
+
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, createdAt])
+  @@map("balance_snapshots")
+}
+
+/// Unified transaction ledger (buy/sell/transfer/conversion).
+model Transaction {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  externalId      String?           @unique // Exchange or bank reference
+  userId          String?           @db.Uuid
+  type            TransactionType
+  asset           String            @db.VarChar(10)
+  amount          Decimal           @db.Decimal(24, 8)
+  fiat            String?           @db.VarChar(10)
+  fiatAmount      Decimal?          @db.Decimal(24, 2)
+  rate            Decimal?          @db.Decimal(24, 8)
+  fee             Decimal           @default(0) @db.Decimal(24, 8)
+  feeCurrency     String?           @db.VarChar(10)
+  status          TransactionStatus @default(PENDING)
+  source          String?           // "binance_p2p", "januar", "facilitapay", "manual"
+  description     String?
+  metadata        Json?
+  completedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user            User?             @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([source])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  OPERATIONS & INFRASTRUCTURE                                             │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+/// Managed API keys for external integrations.
+model ApiKey {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label       String
+  keyPrefix   String    @db.VarChar(8) // First 8 chars for identification
+  keyHash     String    @unique // SHA-256 hash of the full key
+  permissions String[]  // ["read:orders", "write:ads", etc.]
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  expiresAt   DateTime?
+  isRevoked   Boolean   @default(false)
+  revokedAt   DateTime?
+  createdById String?   @db.Uuid
+  createdAt   DateTime  @default(now())
+
+  @@index([keyHash])
+  @@index([isRevoked])
+  @@map("api_keys")
+}
+
+/// Infrastructure node fleet management.
+model Node {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hostname        String     @unique
+  ipAddress       String
+  region          String?    @db.VarChar(20)
+  provider        String?    // "hetzner", "aws", "digitalocean"
+  role            String?    // "api", "worker", "db", "proxy"
+  status          NodeStatus @default(ONLINE)
+  version         String?    // Software version running
+  cpuPercent      Decimal?   @db.Decimal(5, 2)
+  memoryPercent   Decimal?   @db.Decimal(5, 2)
+  diskPercent     Decimal?   @db.Decimal(5, 2)
+  uptimeSeconds   Int        @default(0)
+  lastHeartbeatAt DateTime?
+  metadata        Json?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([status])
+  @@map("nodes")
+}
+
+/// Structured system log persistence.
+model SystemLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  level         LogLevel
+  source        String   // "auth", "p2p", "treasury", "exchange", "system"
+  message       String
+  metadata      Json?
+  correlationId String?  @db.Uuid
+  adminId       String?  @db.Uuid
+  ipAddress     String?
+  createdAt     DateTime @default(now())
+
+  @@index([level])
+  @@index([source])
+  @@index([correlationId])
+  @@index([createdAt])
+  @@map("system_logs")
+}
+
+/// Periodic service health check results.
+model HealthCheck {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service    String   // "database", "binance_api", "januar_api", "redis"
+  status     String   // "healthy", "degraded", "down"
+  latencyMs  Int?
+  message    String?
+  metadata   Json?
+  checkedAt  DateTime @default(now())
+
+  @@index([service, checkedAt])
+  @@map("health_checks")
+}
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  COMPLIANCE & AUDIT                                                      │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+/// Full admin action audit trail.
+model AuditLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId       String   @db.Uuid
+  action        String   // "user.freeze", "order.release", "ad.create", etc.
+  resource      String   // "user", "order", "advertisement", etc.
+  resourceId    String?  // ID of the affected resource
+  method        String   @db.VarChar(10) // HTTP method
+  path          String   // Request path
+  ipAddress     String
+  userAgent     String?
+  requestBody   Json?    // Sanitized request payload
+  responseCode  Int?     // HTTP response status
+  duration      Int?     // Request duration in ms
+  correlationId String?  @db.Uuid
+  createdAt     DateTime @default(now())
+
+  admin         Admin    @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  NOTIFICATIONS                                                           │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+/// In-app notification system for admin dashboard.
+model Notification {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId   String           @db.Uuid
+  type      NotificationType @default(SYSTEM)
+  title     String
+  body      String
+  actionUrl String?          // Deep link into dashboard
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  admin     Admin            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }

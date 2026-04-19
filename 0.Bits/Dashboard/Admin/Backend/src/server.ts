@@ -1,64 +1,130 @@
 import express from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { errorHandler } from './middleware/error';
+import { v4 as uuid } from 'uuid';
+
+import { config } from './config/index.js';
+import { createLogger } from './lib/logger.js';
+import { checkDatabaseHealth, disconnectDatabase } from './lib/db.js';
+import { sendSuccess, sendError } from './lib/response.js';
+
+// Middleware
+import { createCorsMiddleware } from './middleware/cors.js';
+import { publicLimiter, authLimiter } from './middleware/rate-limit.js';
+import { errorHandler } from './middleware/error.js';
+
+// Routers
+import { authRouter } from './routes/auth.router.js';
+import { p2pRouter } from './routes/p2p.router.js';
+import { treasuryRouter } from './routes/treasury.router.js';
+import { usersRouter } from './routes/users.router.js';
+import { operationsRouter } from './routes/operations.router.js';
+import { complianceRouter } from './routes/compliance.router.js';
+import { notificationsRouter } from './routes/notifications.router.js';
+
+const log = createLogger('server');
+
+// ── App Factory ──────────────────────────────────────
 
 const app = express();
 
-// 1. Extreme Transport Security
+// 1. Security headers
 app.use(helmet({
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
-  frameguard: { action: 'deny' }
+  frameguard: { action: 'deny' },
+  contentSecurityPolicy: config.NODE_ENV === 'production' ? undefined : false,
 }));
 
-// 2. Strict CORS policy
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://0.bits.axion.exchange'] // Strict institutional whitelisting
-    : 'http://localhost:3000',
-  credentials: true
-}));
+// 2. CORS
+app.use(createCorsMiddleware());
 
-// 3. Payload parsing & limiting to prevent buffer overflow attacks
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// 3. Body parsing
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
-// 4. Rate braking to mitigate brute-forcing
-const institutionalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window`
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Strict rate limit exceeded. Institutional lockdown initiated.' }
+// 4. Correlation ID injection (for request tracing)
+app.use((req, _res, next) => {
+  req.correlationId = (req.headers['x-correlation-id'] as string) ?? uuid();
+  next();
 });
 
-app.use('/api', institutionalLimiter);
+// 5. Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    log.info(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`, {
+      correlationId: req.correlationId,
+    });
+  });
+  next();
+});
 
-// --- 5. Phase 4: API Endpoint Scaffolding (Stubs) ---
-import { Router } from 'express';
-const complianceRouter = Router();
-complianceRouter.get('/users', (req, res) => res.json({ msg: 'Compliance Users Mock' }));
+// ── Public Routes (no auth required) ─────────────────
 
-const treasuryRouter = Router();
-treasuryRouter.get('/aggregate', (req, res) => res.json({ msg: 'Treasury NAV Mock' }));
+// Health check (public, for load balancers / uptime monitors)
+app.get('/api/v1/health', publicLimiter, async (_req, res) => {
+  const dbHealthy = await checkDatabaseHealth();
+  sendSuccess(res, {
+    status: dbHealthy ? 'operational' : 'degraded',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+  });
+});
 
-const p2pRouter = Router();
-p2pRouter.get('/orders/active', (req, res) => res.json({ msg: 'Active P2P Orders Mock' }));
+// Auth routes (login is public, others require auth internally)
+app.use('/api/v1/auth', publicLimiter, authRouter);
 
-const infraRouter = Router();
-infraRouter.get('/health', (req, res) => res.json({ status: 'SECURE_AND_OPERATIONAL' }));
+// ── Authenticated Routes ─────────────────────────────
 
-app.use('/api/v1/compliance', complianceRouter);
-app.use('/api/v1/treasury', treasuryRouter);
-app.use('/api/v1/p2p', p2pRouter);
-app.use('/api/v1/infrastructure', infraRouter);
+app.use('/api/v1/p2p', authLimiter, p2pRouter);
+app.use('/api/v1/treasury', authLimiter, treasuryRouter);
+app.use('/api/v1/users', authLimiter, usersRouter);
+app.use('/api/v1/operations', authLimiter, operationsRouter);
+app.use('/api/v1/compliance', authLimiter, complianceRouter);
+app.use('/api/v1/notifications', authLimiter, notificationsRouter);
 
-// Global Error Interceptor
+// ── 404 Handler ──────────────────────────────────────
+
+app.use((_req, res) => {
+  sendError(res, 404, 'NOT_FOUND', 'The requested endpoint does not exist');
+});
+
+// ── Global Error Handler ─────────────────────────────
+
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 4000;
+// ── Server Startup ───────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`[INSTITUTIONAL CORE] Secure API enforcing on port ${PORT}`);
+const PORT = config.PORT;
+
+const server = app.listen(PORT, () => {
+  log.info(`0.Bits API server running on port ${PORT}`, {
+    env: config.NODE_ENV,
+    port: PORT,
+  });
 });
+
+// ── Graceful Shutdown ────────────────────────────────
+
+async function shutdown(signal: string) {
+  log.info(`${signal} received — shutting down gracefully...`);
+
+  server.close(async () => {
+    log.info('HTTP server closed');
+    await disconnectDatabase();
+    log.info('Database disconnected');
+    process.exit(0);
+  });
+
+  // Force shutdown after 10s
+  setTimeout(() => {
+    log.error('Forced shutdown after 10s timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+export default app;
