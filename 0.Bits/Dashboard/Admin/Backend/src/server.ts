@@ -20,6 +20,9 @@ import { usersRouter } from './routes/users.router.js';
 import { operationsRouter } from './routes/operations.router.js';
 import { complianceRouter } from './routes/compliance.router.js';
 import { notificationsRouter } from './routes/notifications.router.js';
+import { teamRouter } from './routes/team.router.js';
+import { tasksRouter } from './routes/tasks.router.js';
+import { dashboardRouter } from './routes/dashboard.router.js';
 
 const log = createLogger('server');
 
@@ -83,6 +86,9 @@ app.use('/api/v1/users', authLimiter, usersRouter);
 app.use('/api/v1/operations', authLimiter, operationsRouter);
 app.use('/api/v1/compliance', authLimiter, complianceRouter);
 app.use('/api/v1/notifications', authLimiter, notificationsRouter);
+app.use('/api/v1/team', authLimiter, teamRouter);
+app.use('/api/v1/tasks', authLimiter, tasksRouter);
+app.use('/api/v1/dashboard', authLimiter, dashboardRouter);
 
 // ── 404 Handler ──────────────────────────────────────
 

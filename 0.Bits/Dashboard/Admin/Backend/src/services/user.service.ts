@@ -92,6 +92,45 @@ export class UserService {
     ]);
     return { data, total, page, limit };
   }
+
+  // ── KYB ──────────────────────────────────────────────
+
+  async listByKybStatus(status: string, page: number = 1, limit: number = 25) {
+    const where: Prisma.UserWhereInput = { kybStatus: status as any };
+    const [data, total] = await Promise.all([
+      prisma.user.findMany({ where, orderBy: { updatedAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.user.count({ where }),
+    ]);
+    return { data, total, page, limit };
+  }
+
+  async approveKyb(userId: string, adminId: string) {
+    await prisma.user.update({ where: { id: userId }, data: { kybStatus: 'APPROVED' as any } });
+  }
+
+  async rejectKyb(userId: string, adminId: string, reason?: string) {
+    await prisma.user.update({ where: { id: userId }, data: { kybStatus: 'REJECTED' as any } });
+  }
+
+  // ── Transactions (buy/sell filters) ──────────────────
+
+  async listBuyTransactions(page: number = 1, limit: number = 25) {
+    const where: Prisma.TransactionWhereInput = { type: 'BUY' };
+    const [data, total] = await Promise.all([
+      prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.transaction.count({ where }),
+    ]);
+    return { data, total, page, limit };
+  }
+
+  async listSellTransactions(page: number = 1, limit: number = 25) {
+    const where: Prisma.TransactionWhereInput = { type: 'SELL' };
+    const [data, total] = await Promise.all([
+      prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.transaction.count({ where }),
+    ]);
+    return { data, total, page, limit };
+  }
 }
 
 export const userService = new UserService();

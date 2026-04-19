@@ -621,3 +621,113 @@ model Notification {
   @@index([createdAt])
   @@map("notifications")
 }
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  TEAM & TASKS                                                            │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+/// Team members (extends Admin with team-specific metadata).
+model TeamMember {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId      String    @unique @db.Uuid
+  department   String?   // "Engineering", "Operations", "Compliance"
+  title        String?   // "Head of P2P", "Risk Analyst"
+  timezone     String?   @db.VarChar(50)
+  isOnline     Boolean   @default(false)
+  lastActiveAt DateTime?
+  joinedAt     DateTime  @default(now())
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("team_members")
+}
+
+/// Internal meetings/calls.
+model Meeting {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String?
+  organizer   String        // Admin display name or email
+  organizerId String?       @db.Uuid
+  attendees   String[]      // Array of admin emails/names
+  location    String?       // "Zoom", "Google Meet", room name
+  meetingUrl  String?
+  startsAt    DateTime
+  endsAt      DateTime
+  status      MeetingStatus @default(SCHEDULED)
+  notes       String?
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([startsAt])
+  @@index([status])
+  @@map("meetings")
+}
+
+/// Admin schedules / shifts.
+model Schedule {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId     String   @db.Uuid
+  adminName   String
+  title       String   // "P2P Monitoring Shift", "On-Call", etc.
+  dayOfWeek   Int?     // 0=Sunday, 6=Saturday (for recurring)
+  startsAt    DateTime
+  endsAt      DateTime
+  isRecurring Boolean  @default(false)
+  notes       String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([adminId])
+  @@index([startsAt])
+  @@map("schedules")
+}
+
+/// Task management for admin dashboard.
+model Task {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(MEDIUM)
+  assigneeId   String?      @db.Uuid
+  assigneeName String?
+  reporterId   String?      @db.Uuid
+  reporterName String?
+  dueDate      DateTime?
+  tags         String[]     // ["p2p", "compliance", "urgent"]
+  completedAt  DateTime?
+  metadata     Json?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([status])
+  @@index([assigneeId])
+  @@index([priority])
+  @@map("tasks")
+}

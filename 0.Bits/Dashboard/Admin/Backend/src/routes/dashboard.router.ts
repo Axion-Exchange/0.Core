@@ -1,0 +1,17 @@
+import { Router } from 'express';
+import { dashboardService } from '../services/dashboard.service.js';
+import { requireAuth } from '../middleware/auth.js';
+import { sendSuccess } from '../lib/response.js';
+
+const router = Router();
+router.use(requireAuth);
+
+// GET /summary — Aggregated home dashboard metrics
+router.get('/summary', async (_req, res, next) => {
+  try {
+    const summary = await dashboardService.getSummary();
+    sendSuccess(res, summary);
+  } catch (err) { next(err); }
+});
+
+export { router as dashboardRouter };

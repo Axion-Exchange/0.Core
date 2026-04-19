@@ -99,4 +99,57 @@ router.get('/blocked/list', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── KYB ──────────────────────────────────────────────
+
+// GET /kyb/pending — KYB submissions list
+router.get('/kyb/pending', async (req, res, next) => {
+  try {
+    const page = Number(req.query['page'] ?? 1);
+    const limit = Number(req.query['limit'] ?? 25);
+    const result = await userService.listByKybStatus('PENDING', page, limit);
+    const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
+    sendPaginated(res, result.data, meta);
+  } catch (err) { next(err); }
+});
+
+// PUT /kyb/:id/approve
+router.put('/kyb/:id/approve', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), async (req, res, next) => {
+  try {
+    await userService.approveKyb(param(req, 'id'), req.admin!.sub);
+    sendSuccess(res, { message: 'KYB approved' });
+  } catch (err) { next(err); }
+});
+
+// PUT /kyb/:id/reject
+router.put('/kyb/:id/reject', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), validateBody(kycDecisionSchema), async (req, res, next) => {
+  try {
+    await userService.rejectKyb(param(req, 'id'), req.admin!.sub, req.body.rejectionReason);
+    sendSuccess(res, { message: 'KYB rejected' });
+  } catch (err) { next(err); }
+});
+
+// ── Transaction type filters ─────────────────────────
+
+// GET /transactions/buy — Buy transactions only
+router.get('/transactions/buy', async (req, res, next) => {
+  try {
+    const page = Number(req.query['page'] ?? 1);
+    const limit = Number(req.query['limit'] ?? 25);
+    const result = await userService.listBuyTransactions(page, limit);
+    const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
+    sendPaginated(res, result.data, meta);
+  } catch (err) { next(err); }
+});
+
+// GET /transactions/sell — Sell transactions only
+router.get('/transactions/sell', async (req, res, next) => {
+  try {
+    const page = Number(req.query['page'] ?? 1);
+    const limit = Number(req.query['limit'] ?? 25);
+    const result = await userService.listSellTransactions(page, limit);
+    const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
+    sendPaginated(res, result.data, meta);
+  } catch (err) { next(err); }
+});
+
 export { router as usersRouter };
