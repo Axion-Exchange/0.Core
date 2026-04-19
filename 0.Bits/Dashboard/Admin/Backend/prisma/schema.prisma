@@ -242,10 +242,15 @@ model UserDocument {
 // │  P2P MODULE                                                              │
 // └──────────────────────────────────────────────────────────────────────────┘
 
+enum ExchangeId {
+  BINANCE
+  BITGET
+}
+
 /// Merchant exchange accounts (Binance, Bitget, etc.)
 model P2PAccount {
   id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  exchange      String    // binance, bitget, bybit
+  exchange      ExchangeId
   label         String    // "Binance EUR Main", etc.
   apiKeyEnc     String    // AES-256-GCM encrypted
   apiSecretEnc  String    // AES-256-GCM encrypted

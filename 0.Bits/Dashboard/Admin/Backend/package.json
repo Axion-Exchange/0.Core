@@ -16,12 +16,18 @@
     "db:reset": "prisma migrate reset --force",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["exchange", "p2p", "institutional", "api"],
+  "keywords": [
+    "exchange",
+    "p2p",
+    "institutional",
+    "api"
+  ],
   "author": "Axion Exchange",
   "license": "UNLICENSED",
   "dependencies": {
     "@prisma/client": "^7.7.0",
     "bcryptjs": "^3.0.2",
+    "ccxt": "^4.5.49",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",

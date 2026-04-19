@@ -23,7 +23,7 @@ export const toggleAdSchema = z.object({
 });
 
 export const createAccountSchema = z.object({
-  exchange: z.string().min(1),
+  exchange: z.enum(['BINANCE', 'BITGET']),
   label: z.string().min(1).max(100),
   apiKey: z.string().min(1),
   apiSecret: z.string().min(1),

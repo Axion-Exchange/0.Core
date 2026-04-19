@@ -16,7 +16,7 @@ export class P2PService {
   async createAccount(data: { exchange: string; label: string; apiKey: string; apiSecret: string; passphrase?: string; region?: string }) {
     return prisma.p2PAccount.create({
       data: {
-        exchange: data.exchange,
+        exchange: data.exchange as any,
         label: data.label,
         apiKeyEnc: encrypt(data.apiKey),
         apiSecretEnc: encrypt(data.apiSecret),
