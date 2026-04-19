@@ -1,0 +1,339 @@
+// This is the Prisma schema for 0pool.io backend
+// Multi-tenant design: shared tables with user_id isolation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum RiskTier {
+  Low
+  Medium
+  High
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  YIELD
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REJECTED
+  CANCELED
+}
+
+enum PaymentMethod {
+  SEPA
+  SEPA_INSTANT
+  CRYPTO
+}
+
+enum PositionStatus {
+  ACTIVE
+  CLOSED
+  PENDING
+}
+
+// ─── USERS & AUTH ───────────────────────────────────────
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  name            String?
+  roleId          String    @map("role_id")
+  status          UserStatus @default(INACTIVE)
+  country         String?
+  timezone        String?
+  avatar          String?
+  phone           String?
+  company         String?
+  dateOfBirth     DateTime? @map("date_of_birth")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  lastSignInAt    DateTime? @map("last_sign_in_at")
+  isProtected     Boolean   @default(false) @map("is_protected")
+  isTrashed       Boolean   @default(false) @map("is_trashed")
+  invitedByUserId String?   @map("invited_by_user_id")
+  // 2FA
+  twoFactorSecret  String?  @map("two_factor_secret")
+  twoFactorEnabled Boolean  @default(false) @map("two_factor_enabled")
+  // KYC
+  kycStatus       String    @default("PENDING") @map("kyc_status")
+  // Security
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  role                UserRole              @relation(fields: [roleId], references: [id])
+  invitedBy           User?                 @relation("UserInvites", fields: [invitedByUserId], references: [id])
+  invitees            User[]                @relation("UserInvites")
+  sessions            Session[]
+  positions           Position[]
+  transactions        Transaction[]
+  yields              Yield[]
+  systemLogs          SystemLog[]
+  passwordResetTokens PasswordResetToken[]
+  whitelistedAddresses WhitelistedAddress[]
+
+  @@map("users")
+}
+
+model UserRole {
+  id              String    @id @default(uuid())
+  slug            String    @unique
+  name            String
+  description     String?
+  isTrashed       Boolean   @default(false) @map("is_trashed")
+  isProtected     Boolean   @default(false) @map("is_protected")
+  isDefault       Boolean   @default(false) @map("is_default")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  users           User[]
+  permissions     UserRolePermission[]
+
+  @@map("user_roles")
+}
+
+model UserPermission {
+  id          String    @id @default(uuid())
+  slug        String    @unique
+  name        String
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  roles       UserRolePermission[]
+
+  @@map("user_permissions")
+}
+
+model UserRolePermission {
+  id           String   @id @default(uuid())
+  roleId       String   @map("role_id")
+  permissionId String   @map("permission_id")
+  assignedAt   DateTime @default(now()) @map("assigned_at")
+
+  // Relations
+  role       UserRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission UserPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("user_role_permissions")
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  sessionToken String    @unique @map("session_token")
+  userId       String    @map("user_id")
+  expires      DateTime
+  ipAddress    String?   @map("ip_address")
+  userAgent    String?   @map("user_agent")
+  device       String?
+  os           String?
+  browser      String?
+  location     String?
+  lastActive   DateTime? @map("last_active")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  code      String    // 6-digit OTP
+  token     String    @unique // JWT for URL-based reset
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model WhitelistedAddress {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  type          String   // 'crypto' | 'fiat'
+  asset         String   // 'USDC', 'USDT', 'EUR'
+  networkOrBank String   @map("network_or_bank")
+  address       String
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("whitelisted_addresses")
+}
+
+// ─── LIQUIDITY POOLS ────────────────────────────────────
+
+model Pool {
+  id                   Int       @id @default(autoincrement())
+  name                 String    // e.g. "USDT/EUR"
+  chain                String    // e.g. "Ethereum"
+  riskTier             RiskTier  @map("risk_tier")
+  apy                  Decimal   @db.Decimal(8, 4)
+  feeRate              Decimal   @map("fee_rate") @db.Decimal(8, 4)
+  totalTvl             Decimal   @map("total_tvl") @db.Decimal(20, 2)
+  volume24h            Decimal   @map("volume_24h") @db.Decimal(20, 2)
+  icon                 String?
+  description          String?
+  isActive             Boolean   @default(true) @map("is_active")
+  cryptoDepositAddress String?   @map("crypto_deposit_address")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  positions      Position[]
+  transactions   Transaction[]
+  yields         Yield[]
+  volumeSnapshots PoolVolumeSnapshot[]
+
+  @@map("pools")
+}
+
+model PoolVolumeSnapshot {
+  id     Int      @id @default(autoincrement())
+  poolId Int      @map("pool_id")
+  volume Decimal  @db.Decimal(20, 2)
+  period String   // 'daily', 'weekly', 'monthly'
+  date   DateTime @db.Date
+
+  // Relations
+  pool Pool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+  @@map("pool_volume_snapshots")
+}
+
+// ─── POSITIONS ──────────────────────────────────────────
+
+model Position {
+  id             String         @id @default(uuid())
+  userId         String         @map("user_id")
+  poolId         Int            @map("pool_id")
+  investedAmount Decimal        @map("invested_amount") @db.Decimal(20, 2)
+  currentValue   Decimal        @map("current_value") @db.Decimal(20, 2)
+  currency       String         @default("EUR")
+  status         PositionStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id])
+  pool   Pool    @relation(fields: [poolId], references: [id])
+  yields Yield[]
+
+  @@unique([userId, poolId])
+  @@map("positions")
+}
+
+// ─── TRANSACTIONS ───────────────────────────────────────
+
+model Transaction {
+  id                 String            @id @default(uuid())
+  userId             String            @map("user_id")
+  poolId             Int?              @map("pool_id")
+  type               TransactionType
+  amount             Decimal           @db.Decimal(20, 2)
+  currency           String            @default("EUR")
+  status             TransactionStatus @default(PENDING)
+  paymentMethod      PaymentMethod?    @map("payment_method")
+  cryptoCoin         String?           @map("crypto_coin")
+  cryptoNetwork      String?           @map("crypto_network")
+  cryptoTxHash       String?           @map("crypto_tx_hash")
+  reference          String?
+  destinationAddress String?           @map("destination_address")
+  adminNotes         String?           @map("admin_notes")
+  // Admin portal: who approved/rejected and when
+  processedBy        String?           @map("processed_by")
+  processedAt        DateTime?         @map("processed_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  user User  @relation(fields: [userId], references: [id])
+  pool Pool? @relation(fields: [poolId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("transactions")
+}
+
+// ─── YIELDS ─────────────────────────────────────────────
+
+model Yield {
+  id         String   @id @default(uuid())
+  positionId String   @map("position_id")
+  poolId     Int      @map("pool_id")
+  userId     String   @map("user_id")
+  amount     Decimal  @db.Decimal(20, 6)
+  date       DateTime
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  position Position @relation(fields: [positionId], references: [id])
+  pool     Pool     @relation(fields: [poolId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@map("yields")
+}
+
+// ─── SYSTEM ─────────────────────────────────────────────
+
+model SystemSetting {
+  id                   String  @id @default(uuid())
+  brandName            String  @default("0pools") @map("brand_name")
+  brandLogo            String? @map("brand_logo")
+  depositIban          String? @map("deposit_iban")
+  depositBeneficiary   String? @map("deposit_beneficiary")
+  cryptoDepositAddress String? @map("crypto_deposit_address")
+  primaryColor         String  @default("#00FF66") @map("primary_color")
+  supportEmail         String? @map("support_email")
+  currency             String  @default("EUR")
+
+  @@map("system_settings")
+}
+
+model SystemLog {
+  id          String   @id @default(uuid())
+  event       String
+  userId      String   @map("user_id")
+  entityId    String?  @map("entity_id")
+  entityType  String?  @map("entity_type")
+  description String?
+  ipAddress   String?  @map("ip_address")
+  meta        Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("system_logs")
+}
