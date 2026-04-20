@@ -67,9 +67,6 @@ export class DashboardService {
   async getTransactions() {
     // 100% Database enforcement for sub-10ms UI renders and infinite scroll safety.
     const orders = await prisma.p2POrder.findMany({
-      where: {
-        status: { in: ['COMPLETED', 'RELEASED'] }
-      },
       orderBy: {
         createdAt: 'asc'
       }
@@ -85,7 +82,7 @@ export class DashboardService {
         transaction_date: order.createdAt.toISOString(),
         // Natively fix the COP/MXN chart anomaly by strictly defaulting to the unhedged USDT asset magnitude 
         amount: Number(order.amount) || Number(order.fiatAmount) || 0,
-        expense_status: 'approved', // Maps exactly to the local frontend semantic "success" payload
+        expense_status: (order.status === 'COMPLETED' || order.status === 'RELEASED') ? 'completed' : 'cancelled',
         payment_status: 'cleared',
         category: order.type === 'SELL' ? 'Arbitrage Sell' : 'Arbitrage Buy',
         // Permanently bind the authentic True Legal Name scraped intimately from the undocumented SAPI layer
