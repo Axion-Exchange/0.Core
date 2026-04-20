@@ -1,25 +1,6 @@
 import { PrismaClient } from '@prisma/client';
-import { config } from '../config/index.js';
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-let prismaInstance: PrismaClient | undefined;
-try {
-  prismaInstance = globalForPrisma.prisma ?? new PrismaClient({
-    // @ts-ignore - Bypass TS caching for dynamic Edge parameterization
-    datasourceUrl: config.DATABASE_URL
-  });
-} catch (e: any) {
-  console.error('Prisma Client failed to instantiate natively:', e.message);
-}
-
-export const prisma = prismaInstance as PrismaClient;
-
-if (config.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+export const prisma = new PrismaClient();
 
 /**
  * Verify database connectivity. Called during server startup.
