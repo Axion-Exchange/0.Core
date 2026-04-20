@@ -24,16 +24,27 @@ async function patchHistoricalSapiIdentities() {
 
     if (orders.length === 0) continue;
 
-    // Evaluate first explicit trade natively from the deep JSON metadata to bypass DB migration timestamps
+    // Safely aggressively find the true minimum chronological historical trade date explicitly from JSON metadata payloads bypassing arbitrary Postgres migration sorting
     let firstTradeTimestamp = orders[0].createdAt;
-    const meta = orders[0].metadata as any;
-    if (meta && meta.createTime) {
-      firstTradeTimestamp = new Date(Number(meta.createTime));
+    let minEpoch = Infinity;
+
+    for (const order of orders) {
+       const meta = order.metadata as any;
+       if (meta && meta.createTime) {
+          const epoch = Number(meta.createTime);
+          if (epoch < minEpoch) {
+             minEpoch = epoch;
+             firstTradeTimestamp = new Date(epoch);
+          }
+       }
     }
 
+    // Clone array physically to prevent mutating original sort sequence if needed
+    const sortedOrders = [...orders];
+
     // Find the latest order explicitly providing valid order mapping strings (preferably COMPLETED, fallback to ANY)
-    let validTrade = orders.reverse().find(o => o.status === 'COMPLETED' && o.externalOrderId);
-    if (!validTrade) validTrade = orders.find(o => o.externalOrderId);
+    let validTrade = sortedOrders.reverse().find(o => o.status === 'COMPLETED' && o.externalOrderId);
+    if (!validTrade) validTrade = sortedOrders.find(o => o.externalOrderId);
 
     let actualName = user.legalName || "";
 
