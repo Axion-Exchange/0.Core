@@ -94,6 +94,27 @@ export class DashboardService {
       }
     });
   }
+
+  /**
+   * Serve the Binance SAPI generated Counterparties natively mirroring the UserList CRM format
+   */
+  async getUsers() {
+    const users = await prisma.user.findMany({
+      orderBy: { totalVolume: 'desc' }, // Organically sort by value
+    });
+
+    return users.map((user: any) => ({
+      id: user.id,
+      name: user.legalName || user.displayName,
+      email: `${user.displayName.toLowerCase().replace(/\s+/g, '')}@p2p.binance.com`,
+      role: 'Counterparty',
+      status: user.isBlocked ? 'Blocked' : (user.isFrozen ? 'Inactive' : 'Active'),
+      isTrashed: false,
+      createdAt: user.createdAt.toISOString().split('T')[0],
+      totalVolume: Number(user.totalVolume || 0),
+      totalTrades: Number(user.totalTrades || 0)
+    }));
+  }
 }
 
 export const dashboardService = new DashboardService();

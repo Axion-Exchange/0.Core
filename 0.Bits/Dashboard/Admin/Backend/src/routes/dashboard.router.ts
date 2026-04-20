@@ -22,4 +22,12 @@ router.get('/transactions', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /users — Clean Counterparty mapping natively extracting unique Binancial strings
+router.get('/users', async (_req, res, next) => {
+  try {
+    const users = await dashboardService.getUsers();
+    sendSuccess(res, users);
+  } catch (err) { next(err); }
+});
+
 export { router as dashboardRouter };
