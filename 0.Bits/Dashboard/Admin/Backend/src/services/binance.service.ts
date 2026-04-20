@@ -122,12 +122,12 @@ export class BinanceService {
    */
   async fetchChatMessages(orderId: string): Promise<any[]> {
     try {
-      if (!this.ccxt.has['privateGetSapiV1C2cChatRetrieve']) {
+      if (!this.client.has['privateGetSapiV1C2cChatRetrieve']) {
          throw new Error("CCXT natively lacks explicit definition for chat/retrieve payload arrays.");
       }
       
       // If the signature structurally exists via arbitrary endpoint configs, fire aggressively:
-      const payload = await this.ccxt.request('sapi/v1/c2c/chat/retrieve', 'private', 'GET', { orderNo: orderId });
+      const payload = await this.client.request('sapi/v1/c2c/chat/retrieve', 'private', 'GET', { orderNo: orderId });
       
       if (payload && payload.data && Array.isArray(payload.data)) {
         return payload.data;

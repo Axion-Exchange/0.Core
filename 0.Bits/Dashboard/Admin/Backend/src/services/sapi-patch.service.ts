@@ -58,13 +58,19 @@ class SapiPatchService {
 
       if (orders.length === 0) continue;
 
-      // Safely aggressively find the true minimum chronological historical trade date primarily from JSON metadata payloads bypassing arbitrary Postgres migration sorting
-      let firstTradeTimestamp = orders[0].createdAt;
-      let minEpoch = Infinity;
-      
-      let oldestOrderId: string | null = null;
+      // Chronologically organize the orders strictly by their numerical Binance ID string which logically always implicitly increments over time natively
+      const chronologicallySortedOrders = orders
+         .filter(o => o.externalOrderId)
+         .sort((a, b) => a.externalOrderId!.localeCompare(b.externalOrderId!));
 
-      for (const order of orders) {
+      if (chronologicallySortedOrders.length === 0) continue;
+
+      let firstTradeTimestamp = chronologicallySortedOrders[0].createdAt;
+      let oldestOrderId: string | null = chronologicallySortedOrders[0].externalOrderId;
+      let minEpoch = Infinity;
+
+      // Also double check natively against metadata just in case SAPI mappings organically override implicit sequences correctly
+      for (const order of chronologicallySortedOrders) {
          const meta = order.metadata as any;
          if (meta && meta.createTime) {
             const epoch = Number(meta.createTime);

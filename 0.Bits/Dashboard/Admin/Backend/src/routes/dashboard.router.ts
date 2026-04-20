@@ -53,7 +53,10 @@ router.get('/sync-users/status', async (_req, res) => {
 router.get('/users/:id', async (req, res, next) => {
   try {
     const profile = await dashboardService.getUserProfile(req.params.id);
-    if (!profile) return res.status(404).json({ success: false, message: 'Counterparty physically untraceable' });
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Counterparty physically untraceable' });
+      return;
+    }
     sendSuccess(res, profile);
   } catch (err) { next(err); }
 });
