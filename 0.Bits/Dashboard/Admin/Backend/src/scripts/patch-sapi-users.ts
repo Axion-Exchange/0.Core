@@ -19,13 +19,17 @@ async function patchHistoricalSapiIdentities() {
     const orders = await prisma.p2POrder.findMany({
       where: { counterparty: user.externalId },
       orderBy: { createdAt: 'asc' },
-      select: { externalOrderId: true, createTime: true, createdAt: true, status: true, type: true }
+      select: { externalOrderId: true, metadata: true, createdAt: true, status: true, type: true }
     });
 
     if (orders.length === 0) continue;
 
-    // Evaluate first explicit trade
-    const firstTradeTimestamp = orders[0].createTime ? new Date(Number(orders[0].createTime)) : orders[0].createdAt;
+    // Evaluate first explicit trade natively from the deep JSON metadata to bypass DB migration timestamps
+    let firstTradeTimestamp = orders[0].createdAt;
+    const meta = orders[0].metadata as any;
+    if (meta && meta.createTime) {
+      firstTradeTimestamp = new Date(Number(meta.createTime));
+    }
 
     // Find the latest order explicitly providing valid order mapping strings (preferably COMPLETED, fallback to ANY)
     let validTrade = orders.reverse().find(o => o.status === 'COMPLETED' && o.externalOrderId);
