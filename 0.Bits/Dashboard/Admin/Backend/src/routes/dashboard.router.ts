@@ -14,4 +14,12 @@ router.get('/summary', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /transactions — High definition P2P orders for the frontend Tremor charts
+router.get('/transactions', async (_req, res, next) => {
+  try {
+    const tx = await dashboardService.getTransactions();
+    sendSuccess(res, tx);
+  } catch (err) { next(err); }
+});
+
 export { router as dashboardRouter };

@@ -57,6 +57,35 @@ export class DashboardService {
       timestamp: now.toISOString(),
     };
   }
+
+  /**
+   * Get all live P2P Orders formatted for the Tremor Volume Chart.
+   */
+  async getTransactions() {
+    const orders = await prisma.p2POrder.findMany({
+      where: {
+        status: { in: ['COMPLETED', 'RELEASED'] }
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
+
+    return orders.map(order => {
+      return {
+        id: order.id,
+        // Standardize datetime formatting string for tremor chart indexing
+        transaction_date: order.createdAt.toISOString(),
+        amount: Number(order.fiatAmount),
+        expense_status: 'successful',
+        category: order.type === 'SELL' ? 'Arbitrage Sell' : 'Arbitrage Buy',
+        merchant: order.metadata && (order.metadata as Record<string, any>).counterparty_name 
+            ? String((order.metadata as Record<string, any>).counterparty_name) 
+            : 'Binance P2P User',
+        country: 'Global', 
+      }
+    });
+  }
 }
 
 export const dashboardService = new DashboardService();
