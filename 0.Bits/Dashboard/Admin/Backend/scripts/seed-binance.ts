@@ -68,8 +68,8 @@ async function seedBinanceHistory() {
             totalArchived++;
           }
 
-          if (batchSize < 100) {
-            hasMore = false; // Exhausted window natively
+          if (batchSize < 50) {
+            hasMore = false; // Exhausted window natively, Binance max array return is ~50
           } else {
             page++;
           }
