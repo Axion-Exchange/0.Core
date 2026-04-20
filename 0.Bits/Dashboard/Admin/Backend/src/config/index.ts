@@ -18,8 +18,8 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('24h'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
-  // CORS
-  CORS_ORIGINS: z.string().default('http://localhost:5173'),
+  // CORS (Defaults gracefully to explicit prod and dev environments)
+  CORS_ORIGINS: z.string().default('http://localhost:5173,https://0bit.app,https://www.0bit.app'),
 
   // Encryption
   ENCRYPTION_KEY: z.string().optional(),
