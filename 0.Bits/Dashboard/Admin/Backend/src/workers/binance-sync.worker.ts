@@ -52,6 +52,22 @@ class BinanceSyncWorker {
         const fiatAmount = parseFloat(order.totalPrice) || 0;
         const createTime = new Date(Number(order.createTime)); // Fix to UNIX epoch
 
+        // Check if we already mapped this order securely beforehand to avoid 429 rate limit spamming
+        const existingRecord = await prisma.p2POrder.findUnique({
+          where: { externalOrderId: order.orderNumber }
+        });
+
+        let counterpartyNameStr = existingRecord?.counterpartyName;
+
+        // Extract native Binance Legal Identities dynamically on missed records
+        if (!counterpartyNameStr && mappedStatus === OrderStatus.COMPLETED) {
+           const names = await binanceService.fetchTrueLegalName(order.orderNumber);
+           if (names) {
+              // Priority map to the valid side
+              counterpartyNameStr = order.tradeType === 'BUY' ? names.sellerName : names.buyerName;
+           }
+        }
+
         // Upsert into Database (ExternalOrderId enforces uniqueness)
         await prisma.p2POrder.upsert({
           where: { externalOrderId: order.orderNumber },
@@ -64,6 +80,7 @@ class BinanceSyncWorker {
             price: parseFloat(order.unitPrice) || 0,
             type: order.tradeType === 'BUY' ? AdType.BUY : AdType.SELL, // Their API matches our generic BUY/SELL ENUM
             counterparty: order.counterPartNickName || 'Binance P2P User',
+            counterpartyName: counterpartyNameStr, // Natively write the true identity map!
             paymentMethod: order.payMethodName,
             status: mappedStatus,
             createdAt: createTime,
@@ -72,6 +89,7 @@ class BinanceSyncWorker {
           },
           update: {
             status: mappedStatus,
+            counterpartyName: counterpartyNameStr, // Inject dynamically onto existing backwards-synced trades
             metadata: order, // Continually refresh logs if changes happened natively (e.g. disputes)
           }
         });

@@ -2,6 +2,8 @@ import ccxt from 'ccxt';
 import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
 
+import * as crypto from 'crypto';
+
 export class BinanceService {
   private client: any;
   private enabled: boolean = false;
@@ -18,6 +20,42 @@ export class BinanceService {
       logger.warn('[BinanceService] BINANCE_API_KEY is missing. CCXT Integration is Disabled.');
       // Stub it for typescript to compile, but flag to false
       this.client = new ccxt.binance();
+    }
+  }
+
+  /**
+   * Undocumented Binance SAPI endpoint to explicitly extract True Legal Identity
+   */
+  async fetchTrueLegalName(orderNumber: string): Promise<{ buyerName?: string, sellerName?: string } | null> {
+    if (!this.enabled || !config.BINANCE_API_SECRET) return null;
+    
+    try {
+      const timestamp = Date.now();
+      const query = `timestamp=${timestamp}`;
+      const signature = crypto.createHmac('sha256', config.BINANCE_API_SECRET).update(query).digest('hex');
+      
+      const url = `https://api.binance.com/sapi/v1/c2c/orderMatch/getUserOrderDetail?${query}&signature=${signature}`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-MBX-APIKEY': config.BINANCE_API_KEY!,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ adOrderNo: orderNumber })
+      });
+      
+      const json: any = await response.json();
+      if (json && json.success && json.data) {
+        return {
+          buyerName: json.data.buyerName || undefined,
+          sellerName: json.data.sellerName || undefined
+        };
+      }
+      return null;
+    } catch(err) {
+      logger.error(`[BinanceService] fetchTrueLegalName error for ${orderNumber}:`, err);
+      return null;
     }
   }
 

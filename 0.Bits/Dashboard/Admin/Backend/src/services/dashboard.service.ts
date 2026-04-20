@@ -83,13 +83,15 @@ export class DashboardService {
         transaction_id: order.id,
         // Standardize datetime formatting string for tremor chart indexing
         transaction_date: order.createdAt.toISOString(),
-        amount: Number(order.fiatAmount) || Number(order.amount) || 0,
+        // Natively fix the COP/MXN chart anomaly by strictly defaulting to the unhedged USDT asset magnitude 
+        amount: Number(order.amount) || Number(order.fiatAmount) || 0,
         expense_status: 'approved', // Maps exactly to the local frontend semantic "success" payload
         payment_status: 'cleared',
         category: order.type === 'SELL' ? 'Arbitrage Sell' : 'Arbitrage Buy',
-        merchant: meta.counterparty_name ? String(meta.counterparty_name) : (order.counterparty || 'Binance P2P User'),
+        // Permanently bind the authentic True Legal Name scraped intimately from the undocumented SAPI layer
+        merchant: order.counterpartyName ? order.counterpartyName : (meta.counterparty_name ? String(meta.counterparty_name) : (order.counterparty || 'Binance P2P User')),
         country: 'Global',
-        currency: order.fiat || 'EUR',
+        currency: order.fiat || 'USD',
         lastEdited: order.updatedAt ? order.updatedAt.toISOString() : order.createdAt.toISOString(),
         continent: 'Europe'
       }
