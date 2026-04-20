@@ -6,7 +6,7 @@ export interface IKycProvider {
 
   /**
    * Standalone ID Verification.
-   * Expects binary buffers (or base64 strings depending on implementation) of ID documents.
+   * Expects binary buffers of ID documents.
    */
   verifyIdDocument(frontImage: Buffer, backImage?: Buffer): Promise<KycResult>;
 
@@ -29,6 +29,41 @@ export interface IKycProvider {
    * Standalone Proof of Address verification using an image of a utility bill or bank statement.
    */
   verifyProofOfAddress(addressDocument: Buffer): Promise<KycResult>;
+
+  /**
+   * Biometric Age Estimation from a face image.
+   */
+  estimateAge(faceImage: Buffer): Promise<KycResult>;
+
+  /**
+   * Match two faces to see if they belong to the same person.
+   */
+  matchFaces(image1: Buffer, image2: Buffer): Promise<KycResult>;
+
+  /**
+   * Search an existing database of faces for a matching face.
+   */
+  searchFace(faceImage: Buffer): Promise<KycResult>;
+
+  /**
+   * Verify an email address natively.
+   */
+  verifyEmail(email: string): Promise<KycResult>;
+
+  /**
+   * Verify a phone number natively.
+   */
+  verifyPhone(phone: string): Promise<KycResult>;
+
+  /**
+   * Create an automated Onboarding Session (if the provider supports UI-hosted sessions).
+   */
+  createSession(payload: Record<string, any>): Promise<KycSessionResult>;
+
+  /**
+   * Get the status of an onboarding session.
+   */
+  getSession(sessionId: string): Promise<KycSessionResult>;
 }
 
 export interface KycResult {
@@ -44,5 +79,13 @@ export interface AmlResult {
   isHit: boolean;          // True if there is a match in an AML database
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
   providerReferenceId: string;
+  metadata?: Record<string, any>;
+}
+
+export interface KycSessionResult {
+  success: boolean;
+  sessionId: string;
+  sessionUrl?: string;
+  status: 'INITIALIZED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
   metadata?: Record<string, any>;
 }
