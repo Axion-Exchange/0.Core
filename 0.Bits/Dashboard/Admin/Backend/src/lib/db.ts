@@ -5,13 +5,18 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+let prismaInstance: PrismaClient | undefined;
+try {
+  prismaInstance = globalForPrisma.prisma ?? new PrismaClient({
     log: config.NODE_ENV === 'development'
       ? ['query', 'info', 'warn', 'error']
       : ['warn', 'error'],
   });
+} catch (e) {
+  console.warn('Prisma Client failed to instantiate. Database functions will use fallback logic.');
+}
+
+export const prisma = prismaInstance as PrismaClient;
 
 if (config.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
