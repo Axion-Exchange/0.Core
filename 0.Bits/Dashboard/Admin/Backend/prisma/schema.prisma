@@ -315,6 +315,7 @@ model P2POrder {
   fee              Decimal     @default(0) @db.Decimal(24, 8)
   type             AdType      // BUY or SELL from merchant perspective
   counterparty     String?     // Counterparty nickname
+  counterpartyName String?     // True Legal Name extracted via undocumented SAPI
   status           OrderStatus @default(PENDING_FIAT)
   paymentMethod    String?     // bank_transfer, pix, etc.
   paymentRef       String?     // Bank reference number
