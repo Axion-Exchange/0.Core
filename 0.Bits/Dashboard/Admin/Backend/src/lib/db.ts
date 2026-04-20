@@ -1,5 +1,6 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 
 export const prisma = new PrismaClient();

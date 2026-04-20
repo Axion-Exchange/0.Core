@@ -24,9 +24,12 @@ async function patchHistoricalSapiIdentities() {
 
     if (orders.length === 0) continue;
 
-    // Safely aggressively find the true minimum chronological historical trade date explicitly from JSON metadata payloads bypassing arbitrary Postgres migration sorting
+    // Safely aggressively find the true minimum chronological historical trade date primarily from JSON metadata payloads bypassing arbitrary Postgres migration sorting
     let firstTradeTimestamp = orders[0].createdAt;
     let minEpoch = Infinity;
+    
+    // First, scan local metadata to find the absolute oldest chronological ID natively
+    let oldestOrderId: string | null = null;
 
     for (const order of orders) {
        const meta = order.metadata as any;
@@ -35,8 +38,26 @@ async function patchHistoricalSapiIdentities() {
           if (epoch < minEpoch) {
              minEpoch = epoch;
              firstTradeTimestamp = new Date(epoch);
+             oldestOrderId = order.externalOrderId;
           }
        }
+    }
+    
+    if (!oldestOrderId && orders[0].externalOrderId) {
+       oldestOrderId = orders[0].externalOrderId;
+    }
+
+    // Forcefully explicitly ping Binance SAPI against the oldest known valid ID strictly retrieving their literal first temporal origin bypassing the Database!
+    if (oldestOrderId) {
+       const historic = await binanceService.fetchTrueLegalName(oldestOrderId);
+       if (historic && historic.createTime) {
+          const apiEpoch = Number(historic.createTime);
+          if (apiEpoch > 0) {
+              firstTradeTimestamp = new Date(apiEpoch);
+          }
+       }
+       // 250ms WAF delay
+       await new Promise(r => setTimeout(r, 250));
     }
 
     // Clone array physically to prevent mutating original sort sequence if needed

@@ -26,7 +26,7 @@ export class BinanceService {
   /**
    * Undocumented Binance SAPI endpoint to explicitly extract True Legal Identity
    */
-  async fetchTrueLegalName(orderNumber: string): Promise<{ buyerName?: string, sellerName?: string } | null> {
+  async fetchTrueLegalName(orderNumber: string): Promise<{ buyerName?: string, sellerName?: string, createTime?: number } | null> {
     if (!this.enabled || !config.BINANCE_API_SECRET) return null;
     
     try {
@@ -47,7 +47,8 @@ export class BinanceService {
       if (json && json.success && json.data) {
         return {
           buyerName: json.data.buyerName || undefined,
-          sellerName: json.data.sellerName || undefined
+          sellerName: json.data.sellerName || undefined,
+          createTime: json.data.createTime || undefined
         };
       }
       return null;
