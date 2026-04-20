@@ -75,4 +75,81 @@ export class BinanceP2PConnector {
       throw error;
     }
   }
+
+  /**
+   * VIP Merchant: Get Advertisement Details
+   * SAPI: GET /sapi/v1/c2c/ads/getDetailByNo
+   */
+  async getMerchantAdDetail(adsNo: string) {
+    log.info(`Executing VIP SAPI: c2c/ads/getDetailByNo for [${adsNo}]`);
+    try {
+      const response = await this.client.request('c2c/ads/getDetailByNo', 'sapi', 'GET', { adsNo });
+      return response;
+    } catch (error) {
+      log.error(`Failed to fetch VIP Ad Details for [${adsNo}]`, { error });
+      throw error;
+    }
+  }
+
+  /**
+   * VIP Merchant: Create Advertisement
+   * SAPI: POST /sapi/v1/c2c/ads/post
+   * Requires strict 'classify' and 'onlineNow' to bypass 'illegal parameter' rejection.
+   */
+  async createMerchantAd(params: Record<string, any>) {
+    log.info('Executing VIP SAPI: c2c/ads/post');
+    try {
+      // Ensure specific VIP parameters are set if not provided.
+      const payload = {
+        classify: 'mass', // default merchant requirement
+        onlineNow: true, 
+        ...params
+      };
+      const response = await this.client.request('c2c/ads/post', 'sapi', 'POST', payload);
+      return response;
+    } catch (error) {
+      log.error('Failed to POST new VIP Ad', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * VIP Merchant: Update Advertisement Surplus Amount
+   * Uses precise algebraic mapping as calculated against Binance Support parameters.
+   */
+  async updateMerchantAdSurplus(adsNo: string, newSurplusAmount: number) {
+    log.info(`Executing VIP Surplus Math for [${adsNo}] -> target: ${newSurplusAmount}`);
+    
+    try {
+      // Step 1: Fetch current state via private Detail endpoint
+      const detailRes = await this.getMerchantAdDetail(adsNo);
+      
+      // We assume detailRes strictly maps to binomial payload struct (e.g. { data: { initAmount:... } })
+      // Some API structures return it flat. We will extract values dynamically.
+      const data = detailRes.data || detailRes;
+      const initAmountBefore = parseFloat(data.initAmount);
+      const surplusAmountBefore = parseFloat(data.surplusAmount || data.dynamicMaxAmount || data.remainingAmount);
+
+      if (isNaN(initAmountBefore) || isNaN(surplusAmountBefore)) {
+         throw new Error(`Failed to parse init/surplus values for ad ${adsNo}`);
+      }
+
+      // Step 2: Accurate Algebraic Map (Correcting Support's typo)
+      // Eq: init_after = init_before - surplus_before + surplus_after
+      const initAmountAfter = initAmountBefore - surplusAmountBefore + newSurplusAmount;
+
+      log.info(`Math executed: ${initAmountBefore} - ${surplusAmountBefore} + ${newSurplusAmount} = ${initAmountAfter}`);
+
+      // Step 3: Dispatch Update to SAPI
+      const updateRes = await this.client.request('c2c/ads/update', 'sapi', 'POST', {
+        adsNo: adsNo,
+        initAmount: initAmountAfter.toString()
+      });
+
+      return updateRes;
+    } catch (error) {
+       log.error(`Failed to update surplus for [${adsNo}]`, { error });
+       throw error;
+    }
+  }
 }
