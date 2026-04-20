@@ -99,12 +99,9 @@ class SapiPatchService {
          await new Promise(r => setTimeout(r, 250));
       }
 
-      // Clone array physically to prevent mutating original sort sequence if needed
-      const sortedOrders = [...orders];
-
-      // Find the latest order explicitly providing valid order mapping strings
-      let validTrade = sortedOrders.reverse().find(o => o.status === 'COMPLETED' && o.externalOrderId);
-      if (!validTrade) validTrade = sortedOrders.find(o => o.externalOrderId);
+      // Find the absolute latest order chronologically explicitly cleanly structurally providing valid order mapping strings safely maximizing the 30-day Binance SAPI name unmask limit
+      let validTrade = [...chronologicallySortedOrders].reverse().find(o => o.status === 'COMPLETED' && o.externalOrderId);
+      if (!validTrade) validTrade = [...chronologicallySortedOrders].reverse().find(o => o.externalOrderId);
 
       let actualName = user.legalName || "";
 
