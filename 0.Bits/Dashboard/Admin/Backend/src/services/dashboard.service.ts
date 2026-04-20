@@ -62,15 +62,10 @@ export class DashboardService {
 
   /**
    * Get all live P2P Orders formatted for the Tremor Volume Chart.
+   * Strict Data-Archiving Engine: Only serves cached Postgres data fetched silently by the background daemon.
    */
   async getTransactions() {
-    // Attempt CCXT NATIVE fetch first
-    const binanceTrades = await binanceService.fetchP2PVolume();
-    if (binanceTrades && binanceTrades.length > 0) {
-      return binanceTrades;
-    }
-
-    // Fallback back to PostgreSQL synced state if CCXT is disabled or fails
+    // 100% Database enforcement for sub-10ms UI renders and infinite scroll safety.
     const orders = await prisma.p2POrder.findMany({
       where: {
         status: { in: ['COMPLETED', 'RELEASED'] }

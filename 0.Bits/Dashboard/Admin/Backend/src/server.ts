@@ -30,6 +30,7 @@ import { pearRouter } from './routes/pear.router.js';
 import { fiatRouter } from './routes/fiat.router.js';
 import { orchestratorWorker } from './workers/p2p.worker.js';
 import { pearDbSyncWorker } from './workers/pear-db-sync.worker.js';
+import { binanceSyncWorker } from './workers/binance-sync.worker.js';
 
 const log = createLogger('server');
 
@@ -128,6 +129,9 @@ const server = httpServer.listen(PORT, () => {
   
   // Ignite Python-Postgres DB Syncer
   pearDbSyncWorker.start(30000);
+  
+  // Ignite Binance Auditing Archiver
+  binanceSyncWorker.start(30000);
 });
 
 // ── Graceful Shutdown ────────────────────────────────
@@ -139,6 +143,7 @@ async function shutdown(signal: string) {
     log.info('HTTP server closed');
     orchestratorWorker.stop();
     pearDbSyncWorker.stop();
+    binanceSyncWorker.stop();
     await disconnectDatabase();
     log.info('Database disconnected');
     process.exit(0);
