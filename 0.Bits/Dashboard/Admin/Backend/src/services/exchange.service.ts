@@ -3,6 +3,7 @@ import { prisma } from '../lib/db.js';
 import { decrypt } from '../lib/crypto.js';
 import { createLogger } from '../lib/logger.js';
 import type { P2PAccount } from '@prisma/client';
+import { BinanceP2PConnector } from './exchange/binance-p2p.connector.js';
 
 const log = createLogger('exchange-service');
 
@@ -89,8 +90,14 @@ export class ExchangeService {
    */
   async fetchConcurrentP2POrders() {
     return this.executeConcurrently(async (client, account) => {
-      // if (account.exchange === 'BINANCE') -> client.sapiGetC2cOrderMatchListUserOrderHistory()
-      // if (account.exchange === 'BITGET') -> client.privateGetP2pOrders()
+      // Direct explicit adapter mapping
+      if (account.exchange === 'BINANCE') {
+        const adapter = new BinanceP2PConnector(client);
+        const history = await adapter.getTradeHistory();
+        return history;
+      }
+      
+      // Fallback or Bitget stub
       await new Promise(res => setTimeout(res, 50));
       return [];
     });
@@ -101,6 +108,13 @@ export class ExchangeService {
    */
   async fetchConcurrentP2PAds() {
     return this.executeConcurrently(async (client, account) => {
+      if (account.exchange === 'BINANCE') {
+        const adapter = new BinanceP2PConnector(client);
+        // Note: Using public scrape as per institutional standards
+        const ads = await adapter.getPublicAds({ asset: 'USDT', fiat: 'EUR', tradeType: 'BUY' });
+        return ads;
+      }
+
       await new Promise(res => setTimeout(res, 50));
       return [];
     });
