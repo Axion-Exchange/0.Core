@@ -245,6 +245,7 @@ model UserDocument {
 enum ExchangeId {
   BINANCE
   BITGET
+  JANUAR
 }
 
 /// Merchant exchange accounts (Binance, Bitget, etc.)

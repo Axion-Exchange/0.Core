@@ -26,6 +26,7 @@ import { dashboardRouter } from './routes/dashboard.router.js';
 import { kycRouter } from './routes/kyc.router.js';
 import { pearRouter } from './routes/pear.router.js';
 import { orchestratorWorker } from './workers/p2p.worker.js';
+import { pearDbSyncWorker } from './workers/pear-db-sync.worker.js';
 
 const log = createLogger('server');
 
@@ -117,6 +118,9 @@ const server = app.listen(PORT, () => {
   
   // Ignite the background P2P execution loop
   orchestratorWorker.start();
+  
+  // Ignite Python-Postgres DB Syncer
+  pearDbSyncWorker.start(30000);
 });
 
 // ── Graceful Shutdown ────────────────────────────────
@@ -127,6 +131,7 @@ async function shutdown(signal: string) {
   server.close(async () => {
     log.info('HTTP server closed');
     orchestratorWorker.stop();
+    pearDbSyncWorker.stop();
     await disconnectDatabase();
     log.info('Database disconnected');
     process.exit(0);
