@@ -30,4 +30,23 @@ router.get('/users', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+import { sapiPatchService } from '../services/sapi-patch.service.js';
+
+// POST /sync-users — Asynchronously trigger deep Binance SAPI history resolution
+router.post('/sync-users', async (_req, res, next) => {
+  try {
+    const started = await sapiPatchService.triggerBackgroundSync();
+    if (started) {
+      res.status(202).json({ success: true, message: 'Deep Background SAPI Sync initiated successfully. The Dashboard cache will organically populate.' });
+    } else {
+      res.status(409).json({ success: false, message: 'Sync is physically already running sequentially.' });
+    }
+  } catch (err) { next(err); }
+});
+
+// GET /sync-users/status — Polling hook for UI mapping
+router.get('/sync-users/status', async (_req, res) => {
+  res.json({ success: true, data: sapiPatchService.getStatus() });
+});
+
 export { router as dashboardRouter };
