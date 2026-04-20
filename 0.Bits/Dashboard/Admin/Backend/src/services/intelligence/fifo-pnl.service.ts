@@ -21,11 +21,13 @@ export interface PnLSummary {
   inventoryAvgCost: string;
 }
 
+import { prisma } from '../../lib/db.js';
+
 export class FifoPnlService {
   private db: PrismaClient;
 
   constructor(db?: PrismaClient) {
-    this.db = db || new PrismaClient();
+    this.db = db || prisma;
   }
 
   /**
