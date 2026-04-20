@@ -76,17 +76,22 @@ export class DashboardService {
     });
 
     return orders.map((order: any) => {
+      // Safely extract metadata properties to populate granular visual metrics
+      const meta = (order.metadata || {}) as Record<string, any>;
+      
       return {
-        id: order.id,
+        transaction_id: order.id,
         // Standardize datetime formatting string for tremor chart indexing
         transaction_date: order.createdAt.toISOString(),
-        amount: Number(order.fiatAmount),
-        expense_status: 'successful',
+        amount: Number(order.fiatAmount) || Number(order.amount) || 0,
+        expense_status: 'approved', // Maps exactly to the local frontend semantic "success" payload
+        payment_status: 'cleared',
         category: order.type === 'SELL' ? 'Arbitrage Sell' : 'Arbitrage Buy',
-        merchant: order.metadata && (order.metadata as Record<string, any>).counterparty_name 
-            ? String((order.metadata as Record<string, any>).counterparty_name) 
-            : 'Binance P2P User',
-        country: 'Global', 
+        merchant: meta.counterparty_name ? String(meta.counterparty_name) : (order.counterparty || 'Binance P2P User'),
+        country: 'Global',
+        currency: order.fiat || 'EUR',
+        lastEdited: order.updatedAt ? order.updatedAt.toISOString() : order.createdAt.toISOString(),
+        continent: 'Europe'
       }
     });
   }
