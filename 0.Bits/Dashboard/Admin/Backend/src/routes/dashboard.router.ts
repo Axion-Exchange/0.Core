@@ -49,4 +49,21 @@ router.get('/sync-users/status', async (_req, res) => {
   res.json({ success: true, data: sapiPatchService.getStatus() });
 });
 
+// GET /users/:id — Granular CRM entity structurally mapped including order histories seamlessly
+router.get('/users/:id', async (req, res, next) => {
+  try {
+    const profile = await dashboardService.getUserProfile(req.params.id);
+    if (!profile) return res.status(404).json({ success: false, message: 'Counterparty physically untraceable' });
+    sendSuccess(res, profile);
+  } catch (err) { next(err); }
+});
+
+// POST /orders/:orderId/sync-chat — Undocumented SAPI Chat extractor mapped natively into metadata
+router.post('/orders/:orderId/sync-chat', async (req, res, next) => {
+  try {
+    const syncStatus = await dashboardService.syncOrderChat(req.params.orderId);
+    sendSuccess(res, syncStatus);
+  } catch (err) { next(err); }
+});
+
 export { router as dashboardRouter };

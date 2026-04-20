@@ -116,6 +116,28 @@ export class BinanceService {
       return [];
     }
   }
+  /**
+   * Undocumented Binance SAPI extraction stub resolving the raw conversational payloads bound perfectly to exact Order IDs.
+   * Note: This will naturally drop an exception alerting the service layer if the exact SAPI URL signature isn't mapped functionally natively!
+   */
+  async fetchChatMessages(orderId: string): Promise<any[]> {
+    try {
+      if (!this.ccxt.has['privateGetSapiV1C2cChatRetrieve']) {
+         throw new Error("CCXT natively lacks explicit definition for chat/retrieve payload arrays.");
+      }
+      
+      // If the signature structurally exists via arbitrary endpoint configs, fire aggressively:
+      const payload = await this.ccxt.request('sapi/v1/c2c/chat/retrieve', 'private', 'GET', { orderNo: orderId });
+      
+      if (payload && payload.data && Array.isArray(payload.data)) {
+        return payload.data;
+      }
+      return [];
+    } catch (e: any) {
+       console.warn(`CCXT SAPI Chat Explicit Sync Fault Mapping: ${e.message}`);
+       throw e;
+    }
+  }
 }
 
 export const binanceService = new BinanceService();
