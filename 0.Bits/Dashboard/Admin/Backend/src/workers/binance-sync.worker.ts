@@ -68,18 +68,61 @@ class BinanceSyncWorker {
            }
         }
 
+        const counterpartyNickname = order.counterPartNickName || 'Binance P2P User';
+        let userNodeId: string | undefined = existingRecord?.userId || undefined;
+
+        // Mathematically inject user aggregation precisely only on new distinct mutations safely
+        if (!existingRecord) {
+           const userNode = await prisma.user.upsert({
+             where: { externalId: counterpartyNickname },
+             create: {
+               externalId: counterpartyNickname,
+               displayName: counterpartyNickname,
+               legalName: counterpartyNameStr || null,
+               country: 'Global',
+               totalVolume: mappedStatus === OrderStatus.COMPLETED ? cryptoAmount : 0,
+               totalTrades: mappedStatus === OrderStatus.COMPLETED ? 1 : 0
+             },
+             update: {
+               ...(counterpartyNameStr ? { legalName: counterpartyNameStr } : {}),
+               ...(mappedStatus === OrderStatus.COMPLETED ? {
+                  totalVolume: { increment: cryptoAmount },
+                  totalTrades: { increment: 1 }
+               } : {})
+             }
+          });
+          userNodeId = userNode.id;
+        } else if (mappedStatus === OrderStatus.COMPLETED && existingRecord.status !== OrderStatus.COMPLETED) {
+           const userNode = await prisma.user.update({
+             where: { externalId: counterpartyNickname },
+             data: {
+                ...(counterpartyNameStr ? { legalName: counterpartyNameStr } : {}),
+                totalVolume: { increment: cryptoAmount },
+                totalTrades: { increment: 1 }
+             }
+           });
+           userNodeId = userNode.id;
+        } else if (counterpartyNameStr && !existingRecord.counterpartyName) {
+           const userNode = await prisma.user.update({
+             where: { externalId: counterpartyNickname },
+             data: { legalName: counterpartyNameStr }
+           });
+           userNodeId = userNode.id;
+        }
+
         // Upsert into Database (ExternalOrderId enforces uniqueness)
         await prisma.p2POrder.upsert({
           where: { externalOrderId: order.orderNumber },
           create: {
             externalOrderId: order.orderNumber,
+            userId: userNodeId,
             asset: order.asset, // 'USDT'
             fiat: order.fiat, // 'EUR'
             amount: cryptoAmount, 
             fiatAmount: fiatAmount,
             price: parseFloat(order.unitPrice) || 0,
             type: order.tradeType === 'BUY' ? AdType.BUY : AdType.SELL, // Their API matches our generic BUY/SELL ENUM
-            counterparty: order.counterPartNickName || 'Binance P2P User',
+            counterparty: counterpartyNickname,
             counterpartyName: counterpartyNameStr, // Natively write the true identity map!
             paymentMethod: order.payMethodName,
             status: mappedStatus,
@@ -88,6 +131,7 @@ class BinanceSyncWorker {
             metadata: order, // DUMP FULL NATIVE RESPONSE FOR INSTITUTIONAL AUDITING
           },
           update: {
+            userId: userNodeId, // Retain rigid map
             status: mappedStatus,
             counterpartyName: counterpartyNameStr, // Inject dynamically onto existing backwards-synced trades
             metadata: order, // Continually refresh logs if changes happened natively (e.g. disputes)
