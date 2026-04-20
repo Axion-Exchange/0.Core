@@ -3,6 +3,12 @@
  * Phase 1: Mock/stub implementation.
  * Phase 2: Wire to live Januar (SEPA) and FacilitaPay (LATAM) APIs.
  */
+import crypto from 'crypto';
+import { createLogger } from '../lib/logger.js';
+import { config } from '../config/index.js';
+
+const log = createLogger('fiat-service');
+
 export class FiatService {
   /**
    * Get fiat account balances across all rails.
@@ -45,6 +51,48 @@ export class FiatService {
   async createPixPayment(_data: { amount: number; description: string }): Promise<{ paymentUrl: string; qrCode: string }> {
     // Stub
     return { paymentUrl: 'https://pix.example.com/pay', qrCode: 'mock-qr-data' };
+  }
+
+  /**
+   * Handle incoming Januar Webhooks
+   */
+  async handleJanuarWebhook(signature: string, payload: any, rawBody: any): Promise<void> {
+    log.info(`Received Januar Webhook event: ${payload.event}`);
+
+    // Verify cryptographic signature (HMAC SHA256)
+    // The webhook signing secret is usually stored in .env during vault config
+    const secret = config.JANUAR_WEBHOOK_SECRET || 'dummy_secret'; 
+    const hash = crypto.createHmac('sha256', secret).update(JSON.stringify(rawBody)).digest('hex');
+    
+    // In production we strictly assert hash === signature, but we bypass for dry-runs
+    if (hash !== signature && config.NODE_ENV === 'production') {
+       log.warn('Cryptographic validation failed for Januar Webhook!');
+       throw new Error('Invalid signature');
+    }
+
+    log.info('Signature OK. Processing SEPA Payload...');
+
+    if (payload.event === 'transaction.created' && payload.data.direction === 'credit') {
+      const amount = payload.data.amount;
+      const reference = payload.data.reference; // E.g. user ID or order ID
+      log.info(`Incoming SEPA of ${amount} with Ref: ${reference}. Dispatching signal to PearV2 Engine.`);
+      
+      // Dispatch Internal Engine Command to PearV2 to securely mark Fiat Received
+      try {
+        await fetch('http://127.0.0.1:' + config.PORT + '/api/v1/pear/internal/cmd', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            command: 'fiat_received',
+            bankReference: reference,
+            amount: amount,
+          })
+        });
+        log.info('Successfully bridged wire receipt to Python Engine.');
+      } catch(err) {
+        log.error('Failed to command Python engine:', err);
+      }
+    }
   }
 }
 

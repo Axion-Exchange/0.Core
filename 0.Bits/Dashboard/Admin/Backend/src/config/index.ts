@@ -34,6 +34,7 @@ const envSchema = z.object({
   // Fiat rails
   JANUAR_API_KEY: z.string().optional(),
   JANUAR_API_SECRET: z.string().optional(),
+  JANUAR_WEBHOOK_SECRET: z.string().optional(),
   FACILITAPAY_USERNAME: z.string().optional(),
   FACILITAPAY_PASSWORD: z.string().optional(),
 

@@ -3,6 +3,7 @@ import * as path from 'path';
 import fs from 'fs';
 import { prisma, checkDatabaseHealth } from '../lib/db.js';
 import { createLogger } from '../lib/logger.js';
+import { getSocket } from '../lib/socket.js';
 import { AdType, OrderStatus } from '@prisma/client';
 
 const log = createLogger('pear-db-sync');
@@ -100,6 +101,11 @@ export class PearDbSyncWorker {
 
       if (upsertCount > 0) {
         log.info(`✅ Synced ${upsertCount} native SQLite records perfectly to Postgres UI bounds.`);
+        try {
+          getSocket().emit('trade_update', { count: upsertCount, timestamp: Date.now() });
+        } catch(e) {
+          log.warn('Could not emit socket event (maybe not initialized yet)');
+        }
       }
 
     } catch (error) {

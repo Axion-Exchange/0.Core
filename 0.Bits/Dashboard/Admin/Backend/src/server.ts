@@ -1,11 +1,13 @@
 import express from 'express';
 import helmet from 'helmet';
+import { createServer } from 'http';
 import { v4 as uuid } from 'uuid';
 
 import { config } from './config/index.js';
 import { createLogger } from './lib/logger.js';
 import { checkDatabaseHealth, disconnectDatabase } from './lib/db.js';
 import { sendSuccess, sendError } from './lib/response.js';
+import { initSocket } from './lib/socket.js';
 
 // Middleware
 import { createCorsMiddleware } from './middleware/cors.js';
@@ -25,6 +27,7 @@ import { tasksRouter } from './routes/tasks.router.js';
 import { dashboardRouter } from './routes/dashboard.router.js';
 import { kycRouter } from './routes/kyc.router.js';
 import { pearRouter } from './routes/pear.router.js';
+import { fiatRouter } from './routes/fiat.router.js';
 import { orchestratorWorker } from './workers/p2p.worker.js';
 import { pearDbSyncWorker } from './workers/pear-db-sync.worker.js';
 
@@ -95,6 +98,7 @@ app.use('/api/v1/tasks', authLimiter, tasksRouter);
 app.use('/api/v1/dashboard', authLimiter, dashboardRouter);
 app.use('/api/v1/kyc', authLimiter, kycRouter);
 app.use('/api/v1/pear', authLimiter, pearRouter);
+app.use('/api/v1/fiat', publicLimiter, fiatRouter); // Webhooks are authenticated via HMAC signature, not JWT
 
 // ── 404 Handler ──────────────────────────────────────
 
@@ -110,7 +114,10 @@ app.use(errorHandler);
 
 const PORT = config.PORT;
 
-const server = app.listen(PORT, () => {
+const httpServer = createServer(app);
+initSocket(httpServer);
+
+const server = httpServer.listen(PORT, () => {
   log.info(`0.Bits API server running on port ${PORT}`, {
     env: config.NODE_ENV,
     port: PORT,
