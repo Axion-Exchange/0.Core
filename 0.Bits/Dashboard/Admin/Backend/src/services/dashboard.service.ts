@@ -84,7 +84,7 @@ export class DashboardService {
         amount: Number(order.amount) || Number(order.fiatAmount) || 0,
         expense_status: (order.status === 'COMPLETED' || order.status === 'RELEASED') ? 'completed' : 'cancelled',
         payment_status: 'cleared',
-        category: order.type === 'SELL' ? 'Arbitrage Sell' : 'Arbitrage Buy',
+        category: order.type === 'SELL' ? 'Sell' : 'Buy',
         // Permanently bind the authentic True Legal Name scraped intimately from the undocumented SAPI layer
         merchant: order.counterpartyName ? order.counterpartyName : (meta.counterparty_name ? String(meta.counterparty_name) : (order.counterparty || 'Binance P2P User')),
         country: 'Global',
