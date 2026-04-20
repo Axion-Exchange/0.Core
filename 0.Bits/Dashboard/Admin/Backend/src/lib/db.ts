@@ -8,11 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 let prismaInstance: PrismaClient | undefined;
 try {
   prismaInstance = globalForPrisma.prisma ?? new PrismaClient({
-    datasources: {
-      db: {
-        url: config.DATABASE_URL
-      }
-    }
+    datasourceUrl: config.DATABASE_URL
   });
 } catch (e: any) {
   console.error('Prisma Client failed to instantiate natively:', e.message);
