@@ -40,7 +40,8 @@ class SapiPatchService {
     log.info("Executing deep SAPI query constraints bypassing WAF locally...");
 
     const users = await prisma.user.findMany({
-      where: { externalId: { not: null } }
+      where: { externalId: { not: null } },
+      orderBy: { totalVolume: 'desc' }
     });
 
     this.progress.total = users.length;
