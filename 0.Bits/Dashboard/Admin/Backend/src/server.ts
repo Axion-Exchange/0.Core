@@ -24,6 +24,7 @@ import { teamRouter } from './routes/team.router.js';
 import { tasksRouter } from './routes/tasks.router.js';
 import { dashboardRouter } from './routes/dashboard.router.js';
 import { kycRouter } from './routes/kyc.router.js';
+import { orchestratorWorker } from './workers/p2p.worker.js';
 
 const log = createLogger('server');
 
@@ -111,6 +112,9 @@ const server = app.listen(PORT, () => {
     env: config.NODE_ENV,
     port: PORT,
   });
+  
+  // Ignite the background P2P execution loop
+  orchestratorWorker.start();
 });
 
 // ── Graceful Shutdown ────────────────────────────────
@@ -120,6 +124,7 @@ async function shutdown(signal: string) {
 
   server.close(async () => {
     log.info('HTTP server closed');
+    orchestratorWorker.stop();
     await disconnectDatabase();
     log.info('Database disconnected');
     process.exit(0);

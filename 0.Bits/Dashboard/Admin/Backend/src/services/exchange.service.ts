@@ -4,6 +4,7 @@ import { decrypt } from '../lib/crypto.js';
 import { createLogger } from '../lib/logger.js';
 import type { P2PAccount } from '@prisma/client';
 import { BinanceP2PConnector } from './exchange/binance-p2p.connector.js';
+import { BitgetP2PConnector } from './exchange/bitget-p2p.connector.js';
 
 const log = createLogger('exchange-service');
 
@@ -97,7 +98,13 @@ export class ExchangeService {
         return history;
       }
       
-      // Fallback or Bitget stub
+      if (account.exchange === 'BITGET') {
+        const adapter = new BitgetP2PConnector(client);
+        const history = await adapter.getTradeHistory();
+        return history;
+      }
+      
+      // Fallback stub
       await new Promise(res => setTimeout(res, 50));
       return [];
     });
@@ -112,6 +119,12 @@ export class ExchangeService {
         const adapter = new BinanceP2PConnector(client);
         // Note: Using public scrape as per institutional standards
         const ads = await adapter.getPublicAds({ asset: 'USDT', fiat: 'EUR', tradeType: 'BUY' });
+        return ads;
+      }
+
+      if (account.exchange === 'BITGET') {
+        const adapter = new BitgetP2PConnector(client);
+        const ads = await adapter.getMerchantAds();
         return ads;
       }
 
