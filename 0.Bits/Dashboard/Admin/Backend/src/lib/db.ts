@@ -8,12 +8,14 @@ const globalForPrisma = globalThis as unknown as {
 let prismaInstance: PrismaClient | undefined;
 try {
   prismaInstance = globalForPrisma.prisma ?? new PrismaClient({
-    log: config.NODE_ENV === 'development'
-      ? ['query', 'info', 'warn', 'error']
-      : ['warn', 'error'],
+    datasources: {
+      db: {
+        url: config.DATABASE_URL
+      }
+    }
   });
-} catch (e) {
-  console.warn('Prisma Client failed to instantiate. Database functions will use fallback logic.');
+} catch (e: any) {
+  console.error('Prisma Client failed to instantiate natively:', e.message);
 }
 
 export const prisma = prismaInstance as PrismaClient;
