@@ -29,7 +29,7 @@ export class BinanceService {
     
     try {
       // The funding wallet mapping in CCXT
-      const response = await this.client.sapiGetFundingAsset();
+      const response = await this.client.sapiPostAssetGetFundingAsset();
       
       return response.map((asset: any) => ({
         id: asset.asset,
