@@ -8,8 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 let prismaInstance: PrismaClient | undefined;
 try {
   prismaInstance = globalForPrisma.prisma ?? new PrismaClient({
-    // @ts-ignore - Prisma 7/Edge dynamic parameter injection for the VPS instantiation
-    datasources: { db: { url: config.DATABASE_URL } },
+    // @ts-ignore - Bypass TS caching for dynamic Edge parameterization
     datasourceUrl: config.DATABASE_URL
   });
 } catch (e: any) {
