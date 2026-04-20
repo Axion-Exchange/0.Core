@@ -1,4 +1,5 @@
 import { prisma } from '../lib/db.js';
+import { binanceService } from './binance.service.js';
 
 export class DashboardService {
   /**
@@ -40,7 +41,8 @@ export class DashboardService {
       prisma.p2PDispute.count({ where: { status: { in: ['OPEN', 'UNDER_REVIEW', 'EVIDENCE_REQUESTED'] } } }),
       prisma.transaction.aggregate({ _sum: { fiatAmount: true }, where: { status: 'COMPLETED' } }),
       prisma.transaction.aggregate({ _sum: { fiatAmount: true }, where: { status: 'COMPLETED', createdAt: { gte: last24h } } }),
-      prisma.portfolio.findMany({ orderBy: { currency: 'asc' } }),
+      // If Binance returns live balances, use them, otherwise fallback to mock DB portfolios
+      binanceService.fetchFundingBalances().then(b => b.length > 0 ? b : prisma.portfolio.findMany({ orderBy: { currency: 'asc' } })),
       prisma.task.count({ where: { status: { in: ['TODO', 'IN_PROGRESS'] } } }),
       prisma.meeting.count({ where: { startsAt: { gte: now }, status: 'SCHEDULED' } }),
     ]);
@@ -62,6 +64,13 @@ export class DashboardService {
    * Get all live P2P Orders formatted for the Tremor Volume Chart.
    */
   async getTransactions() {
+    // Attempt CCXT NATIVE fetch first
+    const binanceTrades = await binanceService.fetchP2PVolume();
+    if (binanceTrades && binanceTrades.length > 0) {
+      return binanceTrades;
+    }
+
+    // Fallback back to PostgreSQL synced state if CCXT is disabled or fails
     const orders = await prisma.p2POrder.findMany({
       where: {
         status: { in: ['COMPLETED', 'RELEASED'] }
@@ -71,7 +80,7 @@ export class DashboardService {
       }
     });
 
-    return orders.map(order => {
+    return orders.map((order: any) => {
       return {
         id: order.id,
         // Standardize datetime formatting string for tremor chart indexing
