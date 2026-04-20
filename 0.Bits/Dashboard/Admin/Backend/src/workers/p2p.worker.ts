@@ -1,6 +1,7 @@
 import { createLogger } from '../lib/logger.js';
 import { exchangeService } from '../services/exchange.service.js';
 import { prisma } from '../lib/db.js';
+import { pricingEngineService } from '../services/intelligence/pricing-engine.service.js';
 
 const log = createLogger('p2p-orchestrator-worker');
 
@@ -48,10 +49,14 @@ export class P2POrchestratorWorker {
       const orders = await exchangeService.fetchConcurrentP2POrders();
       const ads = await exchangeService.fetchConcurrentP2PAds();
 
-      // Here you would implement standard database commits using prisma
-      // e.g., mapping incoming 'orders' into the local P2POrder table.
-
       log.info(`Pinged CCXT Matrix. Active Orders: ${orders.length} | Scraped Ads: ${ads.length}`);
+      
+      // Compute intelligent Arbitrage bounds over the new metrics
+      const newSpread = await pricingEngineService.computeTargetSellPrice();
+      if (newSpread) {
+         log.info(`Arbitrage Spread Locked. Rebalancing Target SELL => €${newSpread}`);
+      }
+
     } catch (error) {
       log.error('Fatal failure in P2P Orchestrator loop', { error });
     } finally {
