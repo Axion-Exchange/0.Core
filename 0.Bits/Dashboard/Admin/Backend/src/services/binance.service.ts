@@ -66,7 +66,7 @@ export class BinanceService {
       // Format to dashboard expected schema
       return response.data.map((order: any) => ({
         id: order.orderNumber,
-        transaction_date: new Date(order.createTime).toISOString(),
+        transaction_date: new Date(Number(order.createTime)).toISOString(),
         amount: parseFloat(order.amount), // Fiat amount traded
         expense_status: order.orderStatus === 'COMPLETED' ? 'successful' : 'pending',
         category: order.tradeType === 'BUY' ? 'Arbitrage Buy' : 'Arbitrage Sell',
