@@ -41,7 +41,6 @@ async function mapHistoricalSapiVolumes() {
         externalId: counterparty,
         displayName: counterparty,
         legalName: latestOrder?.counterpartyName || null,
-        country: 'Global',
         totalVolume: metrics._sum.amount || 0,
         totalTrades: metrics._count.id || 0,
       }

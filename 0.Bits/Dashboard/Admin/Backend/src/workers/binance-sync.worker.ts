@@ -79,7 +79,6 @@ class BinanceSyncWorker {
                externalId: counterpartyNickname,
                displayName: counterpartyNickname,
                legalName: counterpartyNameStr || null,
-               country: 'Global',
                totalVolume: mappedStatus === OrderStatus.COMPLETED ? cryptoAmount : 0,
                totalTrades: mappedStatus === OrderStatus.COMPLETED ? 1 : 0
              },
