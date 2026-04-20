@@ -1,0 +1,39 @@
+[project]
+name = "pear-v2"
+version = "2.0.0"
+description = "Hardened P2P crypto trading automation platform — unified EUR + COP paths"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "httpx>=0.26.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "google-generativeai>=0.4.0",
+    # COP path dependencies
+    "pyotp>=2.9.0",          # TOTP generation for Binance 2FA (crypto release)
+    "websockets>=12.0",      # Binance P2P chat WebSocket client
+    # Security
+    "slowapi>=0.1.9",        # In-app rate limiting middleware
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "hypothesis>=6.100.0",   # Property-based testing for safety invariants
+    "ruff>=0.2.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+

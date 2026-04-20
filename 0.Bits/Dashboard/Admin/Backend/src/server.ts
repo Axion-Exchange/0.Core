@@ -24,6 +24,7 @@ import { teamRouter } from './routes/team.router.js';
 import { tasksRouter } from './routes/tasks.router.js';
 import { dashboardRouter } from './routes/dashboard.router.js';
 import { kycRouter } from './routes/kyc.router.js';
+import { pearRouter } from './routes/pear.router.js';
 import { orchestratorWorker } from './workers/p2p.worker.js';
 
 const log = createLogger('server');
@@ -92,6 +93,7 @@ app.use('/api/v1/team', authLimiter, teamRouter);
 app.use('/api/v1/tasks', authLimiter, tasksRouter);
 app.use('/api/v1/dashboard', authLimiter, dashboardRouter);
 app.use('/api/v1/kyc', authLimiter, kycRouter);
+app.use('/api/v1/pear', authLimiter, pearRouter);
 
 // ── 404 Handler ──────────────────────────────────────
 

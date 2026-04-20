@@ -1,0 +1,53 @@
+# ============================================================
+# PearV2 — .gitignore
+# ============================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.production
+
+# SQLite databases
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (if dashboard uses npm)
+node_modules/
+package-lock.json
