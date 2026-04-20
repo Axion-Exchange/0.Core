@@ -31,18 +31,16 @@ export class BinanceService {
     
     try {
       const timestamp = Date.now();
-      const query = `timestamp=${timestamp}`;
+      const query = `adOrderNo=${orderNumber}&timestamp=${timestamp}`;
       const signature = crypto.createHmac('sha256', config.BINANCE_API_SECRET).update(query).digest('hex');
       
-      const url = `https://api.binance.com/sapi/v1/c2c/orderMatch/getUserOrderDetail?${query}&signature=${signature}`;
+      const url = `https://api.binance.com/sapi/v1/c2c/orderMatch/getUserOrderDetail`;
       
-      const response = await fetch(url, {
+      const response = await fetch(`${url}?${query}&signature=${signature}`, {
         method: 'POST',
         headers: {
-          'X-MBX-APIKEY': config.BINANCE_API_KEY!,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ adOrderNo: orderNumber })
+          'X-MBX-APIKEY': config.BINANCE_API_KEY!
+        }
       });
       
       const json: any = await response.json();
