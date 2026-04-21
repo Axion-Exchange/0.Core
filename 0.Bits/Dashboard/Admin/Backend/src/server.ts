@@ -32,6 +32,7 @@ import { reconciliationRouter } from './routes/reconciliation.router.js';
 import { orchestratorWorker } from './workers/p2p.worker.js';
 import { pearDbSyncWorker } from './workers/pear-db-sync.worker.js';
 import { binanceSyncWorker } from './workers/binance-sync.worker.js';
+import { chatSyncWorker } from './workers/chat-sync.worker.js';
 
 const log = createLogger('server');
 
@@ -134,6 +135,9 @@ const server = httpServer.listen(PORT, () => {
   
   // Ignite Binance Auditing Archiver
   binanceSyncWorker.start(30000);
+  
+  // Ignite P2P Chat Polling
+  chatSyncWorker.start();
 });
 
 // ── Graceful Shutdown ────────────────────────────────
@@ -146,6 +150,7 @@ async function shutdown(signal: string) {
     orchestratorWorker.stop();
     pearDbSyncWorker.stop();
     binanceSyncWorker.stop();
+    chatSyncWorker.stop();
     await disconnectDatabase();
     log.info('Database disconnected');
     process.exit(0);

@@ -125,7 +125,12 @@ export class DashboardService {
       where: { id },
       include: {
         orders: {
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
+          include: {
+            chatMessages: {
+              orderBy: { timestamp: 'asc' }
+            }
+          }
         }
       }
     });
@@ -159,7 +164,16 @@ export class DashboardService {
         status: order.status,
         date: order.createdAt.toISOString(),
         paymentMethod: order.paymentMethod,
-        chatLogs: (order.metadata as any)?.chatLogs || []
+        chatLogs: order.chatMessages && order.chatMessages.length > 0 
+          ? order.chatMessages.map((msg: any) => ({
+              messageId: msg.externalMsgId,
+              timestamp: msg.timestamp.toISOString(),
+              sender: msg.sender,
+              content: msg.content,
+              type: msg.hasImage ? 'IMAGE' : 'TEXT',
+              messageUrl: msg.imageUrl
+            }))
+          : ((order.metadata as any)?.chatLogs || [])
       }))
     };
   }
@@ -179,17 +193,26 @@ export class DashboardService {
       const fetchedLogs = await binanceService.fetchChatMessages(order.externalOrderId);
       if (Array.isArray(fetchedLogs)) {
          chatLogs = fetchedLogs;
+         
+         for (const chat of chatLogs) {
+           if (!chat.messageId) continue;
+           await prisma.p2PChatMessage.upsert({
+             where: { externalMsgId: chat.messageId },
+             create: {
+               orderId: order.id,
+               externalMsgId: chat.messageId,
+               sender: chat.messageSource === 'SYSTEM' ? 'system' : (chat.senderNo === order.userId ? 'buyer' : 'seller'),
+               content: chat.content || '',
+               hasImage: chat.type === 'IMAGE',
+               imageUrl: chat.type === 'IMAGE' ? chat.messageUrl : null,
+               timestamp: new Date(chat.createTime),
+             },
+             update: {}
+           });
+         }
       } else {
          throw new Error("Undocumented Chat Payload Mapping Invalid");
       }
-
-      const meta = (order.metadata as any) || {};
-      meta.chatLogs = chatLogs;
-
-      await prisma.p2POrder.update({
-        where: { id: orderId },
-        data: { metadata: meta }
-      });
 
       return { success: true, count: chatLogs.length, payload: chatLogs };
 
