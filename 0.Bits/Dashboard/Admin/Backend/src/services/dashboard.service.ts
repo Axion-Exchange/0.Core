@@ -108,7 +108,9 @@ export class DashboardService {
       name: user.legalName || user.displayName,
       email: `${user.displayName.toLowerCase().replace(/\s+/g, '')}@p2p.binance.com`,
       role: 'Counterparty',
-      status: user.isBlocked ? 'Blocked' : (user.isFrozen ? 'Inactive' : 'Active'),
+      status: user.kycStatus === 'APPROVED' ? 'Verified' :
+              (user.kycStatus === 'PENDING' || user.kycStatus === 'IN_REVIEW' ? 'Pending' :
+              (user.kycStatus === 'REJECTED' ? 'Declined' : 'Incomplete')),
       isTrashed: false,
       createdAt: user.createdAt.toISOString().split('T')[0],
       totalVolume: Number(user.totalVolume || 0),
@@ -137,7 +139,9 @@ export class DashboardService {
         name: user.legalName || user.displayName,
         email: `${user.displayName.toLowerCase().replace(/\s+/g, '')}@p2p.binance.com`,
         country: user.country || 'Global',
-        status: user.isBlocked ? 'Blocked' : (user.isFrozen ? 'Inactive' : 'Active'),
+        status: user.kycStatus === 'APPROVED' ? 'Verified' :
+                (user.kycStatus === 'PENDING' || user.kycStatus === 'IN_REVIEW' ? 'Pending' :
+                (user.kycStatus === 'REJECTED' ? 'Declined' : 'Incomplete')),
         joinedDate: user.createdAt.toISOString().split('T')[0],
         totalVolume: Number(user.totalVolume || 0),
         totalTrades: Number(user.totalTrades || 0),
