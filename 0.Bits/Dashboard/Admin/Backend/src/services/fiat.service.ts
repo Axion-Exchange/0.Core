@@ -109,12 +109,32 @@ class JanuarClient {
       const account = Array.isArray(accounts) ? accounts.find((a: any) => a.id === accountId) : null;
       
       if (account) {
-        return {
-          provider: 'januar',
-          currency: account.currency || 'EUR',
-          balance: parseFloat(account.balance || account.availableBalance || '0'),
-          accountId: accountId,
-        };
+        // Januar API returns nested: {"balances": {"EUR": "461.16", "DKK": "0.00"}}
+        let balance = 0;
+        let currency = 'EUR';
+        
+        if (account.balances && typeof account.balances === 'object') {
+          // Sum all non-zero balances (usually just EUR)
+          for (const [curr, val] of Object.entries(account.balances)) {
+            const parsed = parseFloat(val as string);
+            if (parsed > 0) {
+              balance = parsed;
+              currency = curr;
+              break; // Take the first non-zero
+            }
+          }
+          // If all zero, still report EUR
+          if (balance === 0 && account.balances.EUR !== undefined) {
+            balance = parseFloat(account.balances.EUR);
+          }
+        } else {
+          // Legacy flat format fallback
+          balance = parseFloat(account.balance || account.availableBalance || '0');
+          currency = account.currency || 'EUR';
+        }
+        
+        log.info(`Januar live balance: ${balance} ${currency}`);
+        return { provider: 'januar', currency, balance, accountId };
       }
     } catch (err: any) {
       log.error('Januar getBalance failed:', err.message);
@@ -122,29 +142,48 @@ class JanuarClient {
     return null;
   }
 
-  async getTransactions(pageSize: number = 50): Promise<RawBankTx[]> {
+  /**
+   * Fetch ALL transactions from Januar, paginating with pageSize=1000.
+   * Fetches both PAYIN and PAYOUT types for complete institutional audit trail.
+   */
+  async getTransactions(): Promise<RawBankTx[]> {
     const accountId = await this.fetchAccountId();
     if (!accountId) return [];
 
-    try {
-      const response = await this.request('GET', `/accounts/${accountId}/transactions`, { pageSize });
-      const txs = response?.data || response;
-      
-      if (!Array.isArray(txs)) return [];
+    const allTxs: RawBankTx[] = [];
 
-      return txs.map((tx: any) => ({
-        externalId: tx.id || tx.externalId || `januar_${Date.now()}_${Math.random()}`,
-        provider: 'januar',
-        currency: tx.currency || 'EUR',
-        amount: parseFloat(tx.amount || '0'),
-        description: tx.message || tx.reference || tx.description || 'SEPA Transfer',
-        timestamp: tx.completedTime ? new Date(tx.completedTime) : new Date(tx.created_at || tx.createdAt || Date.now()),
-        rawPayload: tx, // MAXIMUM information preservation
-      }));
-    } catch (err: any) {
-      log.error('Januar getTransactions failed:', err.message);
-      return [];
+    // Fetch both PAYINs and PAYOUTs for complete ledger
+    for (const txType of ['PAYIN', 'PAYOUT']) {
+      try {
+        const response = await this.request('GET', `/accounts/${accountId}/transactions`, {
+          pageSize: 1000,
+          types: txType,
+        });
+        const txs = response?.data || response;
+        
+        if (!Array.isArray(txs)) continue;
+
+        for (const tx of txs) {
+          allTxs.push({
+            externalId: tx.id || tx.externalId || `januar_${Date.now()}_${Math.random()}`,
+            provider: 'januar',
+            currency: tx.currency || 'EUR',
+            amount: Math.abs(parseFloat(tx.amount || '0')),
+            description: tx.message || tx.reference || tx.senderName || tx.description || `SEPA ${txType}`,
+            timestamp: tx.completedTime ? new Date(tx.completedTime) : 
+                       tx.paymentTime ? new Date(tx.paymentTime) :
+                       new Date(tx.initiatedTime || tx.created_at || tx.createdAt || Date.now()),
+            rawPayload: tx, // MAXIMUM information — includes counterparty names, IBANs, fees, etc.
+          });
+        }
+
+        log.info(`Januar fetched ${txs.length} ${txType} transactions.`);
+      } catch (err: any) {
+        log.error(`Januar getTransactions(${txType}) failed:`, err.message);
+      }
     }
+
+    return allTxs;
   }
 }
 
