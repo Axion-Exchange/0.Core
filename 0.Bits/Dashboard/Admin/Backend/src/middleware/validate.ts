@@ -29,8 +29,13 @@ export function validateQuery(schema: ZodSchema) {
       sendError(res, 400, 'VALIDATION_ERROR', 'Query parameter validation failed', details);
       return;
     }
-    // Attach validated query back (with coerced types)
-    (req as any).query = result.data;
+    // Attach validated query — use Object.defineProperty to bypass getter-only
+    try {
+      Object.defineProperty(req, 'query', { value: result.data, writable: true });
+    } catch {
+      // Fallback: store on req directly 
+      (req as any).validatedQuery = result.data;
+    }
     next();
   };
 }
