@@ -27,24 +27,15 @@ export class BinanceService {
    * Undocumented Binance SAPI endpoint to explicitly extract True Legal Identity
    */
   async fetchTrueLegalName(orderNumber: string): Promise<{ buyerName?: string, sellerName?: string, createTime?: number } | null> {
-    if (!this.enabled || !config.BINANCE_API_SECRET) return null;
+    if (!this.enabled) return null;
     
     try {
-      const timestamp = Date.now();
-      const query = `adOrderNo=${orderNumber}&timestamp=${timestamp}`;
-      const signature = crypto.createHmac('sha256', config.BINANCE_API_SECRET).update(query).digest('hex');
-      
-      const url = `https://api.binance.com/sapi/v1/c2c/orderMatch/getUserOrderDetail`;
-      
-      const response = await fetch(`${url}?${query}&signature=${signature}`, {
-        method: 'POST',
-        headers: {
-          'X-MBX-APIKEY': config.BINANCE_API_KEY!
-        }
+      // Use CCXT to natively handle signature and proper encoding for the POST request
+      const json = await this.client.request('c2c/orderMatch/getUserOrderDetail', 'sapi', 'POST', {
+         adOrderNo: orderNumber
       });
       
-      const json: any = await response.json();
-      if (json && json.success && json.data) {
+      if (json && json.data) {
         return {
           buyerName: json.data.buyerName || undefined,
           sellerName: json.data.sellerName || undefined,
