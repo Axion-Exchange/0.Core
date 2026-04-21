@@ -3,6 +3,7 @@ import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
 
 import * as crypto from 'crypto';
+import fs from 'fs';
 
 export class BinanceService {
   private client: any;
@@ -30,16 +31,54 @@ export class BinanceService {
     if (!this.enabled) return null;
     
     try {
-      // Use CCXT to natively handle signature and proper encoding for the POST request
-      const json = await this.client.request('c2c/orderMatch/getUserOrderDetail', 'sapi', 'POST', {
-         adOrderNo: orderNumber
-      });
+      let buyerName, sellerName, createTime;
+
+      if (config.BINANCE_API_PRIVATE_KEY_PATH) {
+        // Authenticate with RSA if configured
+        const privateKey = fs.readFileSync(config.BINANCE_API_PRIVATE_KEY_PATH, 'utf8');
+        const timestamp = Date.now();
+        const payload = \`adOrderNo=\${orderNumber}&timestamp=\${timestamp}\`;
+        
+        const signer = crypto.createSign('RSA-SHA256');
+        signer.update(payload);
+        signer.end();
+        const signature = encodeURIComponent(signer.sign(privateKey, 'base64'));
+        
+        const finalBody = \`\${payload}&signature=\${signature}\`;
+        
+        const rawRes = await fetch(\`https://api.binance.com/sapi/v1/c2c/orderMatch/getUserOrderDetail\`, {
+            method: 'POST',
+            headers: {
+              'X-MBX-APIKEY': config.BINANCE_API_KEY!,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: finalBody
+        });
+        
+        const json = await rawRes.json();
+        
+        if (json && json.data) {
+          buyerName = json.data.buyerName;
+          sellerName = json.data.sellerName;
+          createTime = json.data.createTime;
+        }
+      } else {
+         // Fallback to standard CCXT implicit integration (Throws -1000 without RSA Whitelist)
+         const json = await this.client.request('c2c/orderMatch/getUserOrderDetail', 'sapi', 'POST', {
+            adOrderNo: orderNumber
+         });
+         if (json && json.data) {
+             buyerName = json.data.buyerName;
+             sellerName = json.data.sellerName;
+             createTime = json.data.createTime;
+         }
+      }
       
-      if (json && json.data) {
+      if (buyerName || sellerName || createTime) {
         return {
-          buyerName: json.data.buyerName || undefined,
-          sellerName: json.data.sellerName || undefined,
-          createTime: json.data.createTime || undefined
+          buyerName: buyerName || undefined,
+          sellerName: sellerName || undefined,
+          createTime: createTime || undefined
         };
       }
       return null;

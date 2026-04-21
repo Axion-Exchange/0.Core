@@ -27,6 +27,7 @@ const envSchema = z.object({
   // Exchange connectors
   BINANCE_API_KEY: z.string().optional(),
   BINANCE_API_SECRET: z.string().optional(),
+  BINANCE_API_PRIVATE_KEY_PATH: z.string().optional(),
   BITGET_API_KEY: z.string().optional(),
   BITGET_API_SECRET: z.string().optional(),
   BITGET_PASSPHRASE: z.string().optional(),

@@ -34,6 +34,14 @@ router.get('/balances', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /balances-aggregated — For React Frontend Integration (Balances Page)
+router.get('/balances-aggregated', async (_req, res, next) => {
+  try {
+    const data = await treasuryService.getAggregatedPortfolioView();
+    sendSuccess(res, data);
+  } catch(err) { next(err); }
+});
+
 // GET /balances/history — Historical snapshots for charts
 router.get('/balances/history', validateQuery(balanceHistorySchema), async (req, res, next) => {
   try {
