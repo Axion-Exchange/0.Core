@@ -186,7 +186,7 @@ class FacilitaPayClient {
     });
 
     if (!res.ok) throw new Error(`FacilitaPay auth failed: ${res.status}`);
-    const data = await res.json();
+    const data: any = await res.json();
     this.jwt = data.jwt;
     this.jwtExpiresAt = Date.now() / 1000 + 23 * 3600; // 23h expiry
     log.info('FacilitaPay JWT obtained.');
@@ -233,12 +233,12 @@ class FacilitaPayClient {
     // COP account
     if (this.copAccountId) {
       try {
-        const data = await this.request('GET', `/sub_accounts/${this.copAccountId}`);
-        const account = data?.sub_account || data;
+        const data = await this.request('GET', `/bank_accounts/${this.copAccountId}/balance`);
+        const balanceData = data?.data || data;
         balances.push({
           provider: 'facilitapay',
-          currency: account?.currency || 'COP',
-          balance: parseFloat(account?.balance || account?.available_balance || '0'),
+          currency: balanceData?.currency || 'COP',
+          balance: parseFloat(balanceData?.balance || '0'),
           accountId: this.copAccountId,
         });
       } catch (err: any) {
@@ -249,12 +249,12 @@ class FacilitaPayClient {
     // MXN account
     if (this.mxnAccountId) {
       try {
-        const data = await this.request('GET', `/sub_accounts/${this.mxnAccountId}`);
-        const account = data?.sub_account || data;
+        const data = await this.request('GET', `/bank_accounts/${this.mxnAccountId}/balance`);
+        const balanceData = data?.data || data;
         balances.push({
           provider: 'facilitapay',
-          currency: account?.currency || 'MXN',
-          balance: parseFloat(account?.balance || account?.available_balance || '0'),
+          currency: balanceData?.currency || 'MXN',
+          balance: parseFloat(balanceData?.balance || '0'),
           accountId: this.mxnAccountId,
         });
       } catch (err: any) {
@@ -265,28 +265,11 @@ class FacilitaPayClient {
     return balances;
   }
 
-  async getTransactions(accountId: string, currency: string): Promise<RawBankTx[]> {
-    if (!accountId) return [];
-
-    try {
-      const data = await this.request('GET', `/sub_accounts/${accountId}/cash_in_orders`, { per_page: 50 });
-      const orders = data?.cash_in_orders || data?.data || data;
-      
-      if (!Array.isArray(orders)) return [];
-
-      return orders.map((tx: any) => ({
-        externalId: tx.id || tx.external_id || `fp_${Date.now()}_${Math.random()}`,
-        provider: 'facilitapay',
-        currency: currency,
-        amount: parseFloat(tx.amount || tx.original_amount || '0'),
-        description: tx.description || tx.reference || `${currency} Cash-In`,
-        timestamp: new Date(tx.created_at || tx.updated_at || Date.now()),
-        rawPayload: tx, // MAXIMUM information preservation
-      }));
-    } catch (err: any) {
-      log.error(`FacilitaPay ${currency} transactions failed:`, err.message);
-      return [];
-    }
+  async getTransactions(_accountId: string, _currency: string): Promise<RawBankTx[]> {
+    // FacilitaPay is webhook-driven — no bulk transaction listing endpoint.
+    // Transactions arrive via webhook and are persisted in PearV2's SQLite.
+    // The pear-db-sync.worker already bridges those into Postgres.
+    return [];
   }
 }
 
