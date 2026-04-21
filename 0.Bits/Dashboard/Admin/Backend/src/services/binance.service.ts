@@ -122,12 +122,13 @@ export class BinanceService {
    */
   async fetchChatMessages(orderId: string): Promise<any[]> {
     try {
-      if (!this.client.has['privateGetSapiV1C2cChatRetrieve']) {
-         throw new Error("CCXT natively lacks explicit definition for chat/retrieve payload arrays.");
-      }
-      
-      // If the signature structurally exists via arbitrary endpoint configs, fire aggressively:
-      const payload = await this.client.request('sapi/v1/c2c/chat/retrieve', 'private', 'GET', { orderNo: orderId });
+      // Removed the strict CCXT .has[] check because CCXT lacks explicit definitions for the V7.4 SAPI chat pagination array.
+      // We natively execute the raw request against Binance's Gateway bypassing the implicit wrapper.
+      const payload = await this.client.request('c2c/chat/retrieveChatMessagesWithPagination', 'sapi', 'GET', { 
+         orderNo: orderId,
+         page: 1,
+         rows: 100
+      });
       
       if (payload && payload.data && Array.isArray(payload.data)) {
         return payload.data;
