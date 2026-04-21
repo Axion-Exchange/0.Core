@@ -35,9 +35,13 @@ const envSchema = z.object({
   // Fiat rails
   JANUAR_API_KEY: z.string().optional(),
   JANUAR_API_SECRET: z.string().optional(),
+  JANUAR_BASE_URL: z.string().default('https://api.januar.com'),
   JANUAR_WEBHOOK_SECRET: z.string().optional(),
   FACILITAPAY_USERNAME: z.string().optional(),
   FACILITAPAY_PASSWORD: z.string().optional(),
+  FACILITAPAY_BASE_URL: z.string().default('https://api.facilitapay.com/api/v1'),
+  FACILITAPAY_CASH_IN_ACCOUNT_ID: z.string().optional(),
+  FACILITAPAY_MXN_CASH_IN_ACCOUNT_ID: z.string().optional(),
 
   // Logging
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
