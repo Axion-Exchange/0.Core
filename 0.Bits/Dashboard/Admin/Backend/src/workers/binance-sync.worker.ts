@@ -68,7 +68,9 @@ class BinanceSyncWorker {
            }
         }
 
-        const counterpartyNickname = order.counterPartNickName || 'Binance P2P User';
+        // Safely extract the pseudonym intelligently. If it contains '***', physically append the order ID to forcefully isolate the identity since it's fundamentally not globally unique mathematically!
+        const rawNickname = order.counterPartNickName || 'Binance P2P User';
+        const counterpartyNickname = rawNickname.includes('***') ? `${rawNickname}-${order.orderNumber}` : rawNickname;
         let userNodeId: string | undefined = existingRecord?.userId || undefined;
 
         // Mathematically inject user aggregation precisely only on new distinct mutations safely
@@ -77,7 +79,7 @@ class BinanceSyncWorker {
              where: { externalId: counterpartyNickname },
              create: {
                externalId: counterpartyNickname,
-               displayName: counterpartyNickname,
+               displayName: rawNickname,
                legalName: counterpartyNameStr || null,
                totalVolume: mappedStatus === OrderStatus.COMPLETED ? cryptoAmount : 0,
                totalTrades: mappedStatus === OrderStatus.COMPLETED ? 1 : 0
