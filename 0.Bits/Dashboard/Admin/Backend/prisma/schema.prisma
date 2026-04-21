@@ -330,6 +330,7 @@ model P2POrder {
   advertisement    P2PAdvertisement? @relation(fields: [advertisementId], references: [id])
   user             User?             @relation("OrderUser", fields: [userId], references: [id])
   disputes         P2PDispute[]
+  chatMessages     P2PChatMessage[]
 
   @@index([advertisementId])
   @@index([userId])
@@ -337,6 +338,24 @@ model P2POrder {
   @@index([externalOrderId])
   @@index([createdAt])
   @@map("p2p_orders")
+}
+
+/// Persistent, background-synced Binance chat communications natively indexed locally.
+model P2PChatMessage {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String   @db.Uuid
+  externalMsgId   String   @unique // Message ID from Binance to avoid duplicates
+  sender          String?  // system | buyer | seller 
+  content         String   @db.Text
+  hasImage        Boolean  @default(false)
+  imageUrl        String?
+  timestamp       DateTime
+  createdAt       DateTime @default(now())
+
+  order           P2POrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, timestamp])
+  @@map("p2p_chat_messages")
 }
 
 /// Dispute/appeal tracking for contested orders.
