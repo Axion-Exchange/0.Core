@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ReconciliationController } from '../controllers/reconciliation.controller';
+import { ReconciliationController } from '../controllers/reconciliation.controller.js';
 import multer from 'multer';
 import os from 'os';
 

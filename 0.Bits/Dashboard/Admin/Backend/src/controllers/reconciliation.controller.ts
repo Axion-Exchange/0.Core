@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ReconciliationService } from '../services/reconciliation.service';
+import { ReconciliationService } from '../services/reconciliation.service.js';
 import fs from 'fs';
 import path from 'path';
 

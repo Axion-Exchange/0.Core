@@ -56,7 +56,7 @@ export class ReconciliationService {
       const s = statusStr?.toUpperCase() || '';
       if (s.includes('COMPLETED')) status = OrderStatus.COMPLETED;
       else if (s.includes('CANCEL') || s.includes('CLOSED')) status = OrderStatus.CANCELLED;
-      else if (s.includes('APPEAL')) status = OrderStatus.IN_DISPUTE;
+      else if (s.includes('APPEAL')) status = OrderStatus.APPEALING;
       else if (s.includes('RELEASED')) status = OrderStatus.RELEASED;
 
       // 2. Strict UTC Timezone parsing to prevent PnL drift
