@@ -64,7 +64,10 @@ async function recompute() {
   // 2. Perform Native Real-Name Groupings natively
   // Many users might share the identical legalName. We should safely merge them into a single User natively retaining true totals!
   const allUsersWithRealNames = await prisma.user.findMany({
-    where: { legalName: { not: null, not: { contains: '***' } } },
+    where: { 
+       legalName: { not: null },
+       externalId: { not: { contains: '***' } }
+    },
     include: { orders: true }
   });
 
@@ -87,28 +90,24 @@ async function recompute() {
         const master = duplicates.sort((a,b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
         const slaves = duplicates.filter(d => d.id !== master.id);
 
-        let mergedVolume = master.totalVolume;
+        let mergedVolume = Number(master.totalVolume);
         let mergedTrades = master.totalTrades;
 
         for (const slave of slaves) {
-           // Inherit all inherently unique order associations smoothly safely
            for (const o of slave.orders) {
                await prisma.p2POrder.update({
                   where: { id: o.id },
                   data: { userId: master.id }
                });
                if (o.status === 'COMPLETED') {
-                  // Manually logically increment since Decimal types are natively tricky natively
-                  mergedVolume = mergedVolume.add(o.amount);
+                  mergedVolume += Number(o.amount);
                   mergedTrades += 1;
                }
            }
-           // Delete cleanly the slave structural component safely
            await prisma.user.delete({ where: { id: slave.id } });
            mergedCount++;
         }
 
-        // Apply clean mathematical sums structurally directly natively
         await prisma.user.update({
             where: { id: master.id },
             data: { 
