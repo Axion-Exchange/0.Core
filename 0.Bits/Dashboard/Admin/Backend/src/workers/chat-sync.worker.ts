@@ -1,8 +1,9 @@
 import { PrismaClient, OrderStatus } from '@prisma/client';
 import { binanceService } from '../services/binance.service.js';
-import { log } from '../lib/logger.js';
+import { createLogger } from '../lib/logger.js';
 
 const prisma = new PrismaClient();
+const log = createLogger('chat-sync');
 
 export class ChatSyncWorker {
   private isRunning = false;
