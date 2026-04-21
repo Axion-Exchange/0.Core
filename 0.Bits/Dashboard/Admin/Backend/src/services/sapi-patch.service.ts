@@ -53,7 +53,7 @@ class SapiPatchService {
       const orders = await prisma.p2POrder.findMany({
         where: { counterparty: user.externalId },
         orderBy: { createdAt: 'asc' },
-        select: { externalOrderId: true, metadata: true, createdAt: true, status: true, type: true }
+        select: { id: true, externalOrderId: true, metadata: true, createdAt: true, status: true, type: true }
       });
 
       if (orders.length === 0) continue;
@@ -79,6 +79,39 @@ class SapiPatchService {
                firstTradeTimestamp = new Date(epoch);
                oldestOrderId = order.externalOrderId;
             }
+         }
+         
+         // ┌─────────────────────────────────────────────────────────┐
+         // │  CHAT ARCHIVAL SYNC ENGINE BACKGROUND CRON              │
+         // └─────────────────────────────────────────────────────────┘
+         if (order.externalOrderId) {
+             try {
+                 const chatLog = await binanceService.fetchChatMessages(order.externalOrderId);
+                 if (chatLog && chatLog.length > 0) {
+                     for (const msg of chatLog) {
+                        await prisma.p2PChatMessage.upsert({
+                           where: { externalMsgId: msg.id || `${order.externalOrderId}-${msg.createTime}` },
+                           create: {
+                              externalMsgId: msg.id || `${order.externalOrderId}-${msg.createTime}`,
+                              orderId: order.id,
+                              sender: msg.type === 'system' ? 'system' : (msg.self ? 'merchant' : 'counterparty'),
+                              content: msg.content || '',
+                              hasImage: !!msg.imageUrl,
+                              imageUrl: msg.imageUrl || null,
+                              timestamp: new Date(Number(msg.createTime))
+                           },
+                           update: {
+                              content: msg.content || '',
+                              hasImage: !!msg.imageUrl,
+                              imageUrl: msg.imageUrl || null
+                           }
+                        });
+                     }
+                 }
+             } catch(charErr) {
+                 // > 30 day limit or error natively ignored during background cron iteration
+             }
+             await new Promise(r => setTimeout(r, 200)); // Respect Binance SAPI HTTP limits
          }
       }
       
