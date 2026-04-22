@@ -35,6 +35,7 @@ import { pearDbSyncWorker } from './workers/pear-db-sync.worker.js';
 import { binanceSyncWorker } from './workers/binance-sync.worker.js';
 import { chatSyncWorker } from './workers/chat-sync.worker.js';
 import { fiatSyncWorker } from './workers/fiat-sync.worker.js';
+import { kycSyncWorker } from './workers/kyc-sync.worker.js';
 
 const log = createLogger('server');
 
@@ -144,6 +145,9 @@ const server = httpServer.listen(PORT, () => {
   
   // Ignite P2P Chat Polling
   chatSyncWorker.start();
+  
+  // Ignite KYC Didit Polling (30s)
+  kycSyncWorker.start(30000);
 });
 
 // ── Graceful Shutdown ────────────────────────────────
@@ -158,6 +162,7 @@ async function shutdown(signal: string) {
     binanceSyncWorker.stop();
     chatSyncWorker.stop();
     fiatSyncWorker.stop();
+    kycSyncWorker.stop();
     await disconnectDatabase();
     log.info('Database disconnected');
     process.exit(0);
