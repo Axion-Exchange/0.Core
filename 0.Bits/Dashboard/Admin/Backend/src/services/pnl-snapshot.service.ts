@@ -2,7 +2,7 @@
  * P&L Snapshot Service
  * 
  * Computes daily FIFO P&L snapshots and stores them in pnl_snapshots table.
- * Provides time-series data for the Overview P&L chart.
+ * Uses USDT (crypto) amounts — consistent with the dashboard transaction charts.
  */
 
 import { prisma } from "../lib/db.js";
@@ -13,6 +13,7 @@ const log = createLogger("pnl-snapshot");
 
 /**
  * Compute and store daily P&L snapshot for a given currency and date.
+ * Volumes are in USDT (crypto amount), P&L is the spread captured.
  */
 export async function computeDailyPnlSnapshot(currency: string, date: Date) {
   const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -30,8 +31,8 @@ export async function computeDailyPnlSnapshot(currency: string, date: Date) {
       realizedPnl: parseFloat(result.realizedPnl),
       buyCount: result.buyCount,
       sellCount: result.sellCount,
-      buyVolume: parseFloat(result.buyVolumeFiat),
-      sellVolume: parseFloat(result.sellVolumeFiat),
+      buyVolume: parseFloat(result.buyVolumeCrypto),
+      sellVolume: parseFloat(result.sellVolumeCrypto),
       spreadPct: parseFloat(result.spreadPct),
       inventoryQty: parseFloat(result.inventoryQty),
     },
@@ -39,8 +40,8 @@ export async function computeDailyPnlSnapshot(currency: string, date: Date) {
       realizedPnl: parseFloat(result.realizedPnl),
       buyCount: result.buyCount,
       sellCount: result.sellCount,
-      buyVolume: parseFloat(result.buyVolumeFiat),
-      sellVolume: parseFloat(result.sellVolumeFiat),
+      buyVolume: parseFloat(result.buyVolumeCrypto),
+      sellVolume: parseFloat(result.sellVolumeCrypto),
       spreadPct: parseFloat(result.spreadPct),
       inventoryQty: parseFloat(result.inventoryQty),
     },
