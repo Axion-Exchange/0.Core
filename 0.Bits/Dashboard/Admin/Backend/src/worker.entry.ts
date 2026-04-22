@@ -14,6 +14,7 @@
 
 import 'dotenv/config';
 import { createLogger } from './lib/logger.js';
+import { runAllHealthChecks } from './services/health-checker.service.js';
 import { createWorker, registerRepeatableJobs, shutdownQueues, QUEUE_NAMES } from './lib/queue.js';
 import { disconnectRedis } from './lib/redis.js';
 import { disconnectDatabase } from './lib/db.js';

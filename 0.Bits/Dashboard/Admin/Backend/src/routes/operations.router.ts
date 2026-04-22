@@ -79,4 +79,30 @@ router.get('/logs', validateQuery(logQuerySchema), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// ── Health Dashboard (Institutional Monitoring) ──────
+
+import { getHealthDashboard, runAllHealthChecks, getServiceHistory } from '../services/health-checker.service.js';
+
+router.get('/health/dashboard', async (_req, res, next) => {
+  try {
+    const dashboard = await getHealthDashboard();
+    sendSuccess(res, dashboard);
+  } catch (err) { next(err); }
+});
+
+router.post('/health/run', requireRole('ADMIN', 'SUPER_ADMIN'), async (_req, res, next) => {
+  try {
+    const results = await runAllHealthChecks();
+    sendSuccess(res, results);
+  } catch (err) { next(err); }
+});
+
+router.get('/health/history/:service', async (req, res, next) => {
+  try {
+    const history = await getServiceHistory(req.params.service, 30);
+    sendSuccess(res, history);
+  } catch (err) { next(err); }
+});
+
 export { router as operationsRouter };
