@@ -81,7 +81,7 @@ describe('JWT Blacklist — Admin-Wide Revocation', () => {
     );
 
     // The timestamp should be within 1 second of now
-    const storedTs = parseInt(mockRedis.set.mock.calls[0][1], 10);
+    const storedTs = parseInt(mockRedis.set.mock.calls[0]![1] as string, 10);
     expect(storedTs).toBeGreaterThanOrEqual(before);
     expect(storedTs).toBeLessThanOrEqual(before + 1);
   });

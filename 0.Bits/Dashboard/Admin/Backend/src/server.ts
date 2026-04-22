@@ -14,6 +14,8 @@ import { initSocket } from './lib/socket.js';
 import { createCorsMiddleware } from './middleware/cors.js';
 import { publicLimiter, authLimiter } from './middleware/rate-limit.js';
 import { errorHandler } from './middleware/error.js';
+import { sanitizeInput, securityHeaders, enforcePayloadLimits } from './middleware/security.js';
+import hpp from 'hpp';
 
 // Routers
 import { authRouter } from './routes/auth.router.js';
@@ -42,21 +44,32 @@ const app = express();
 // Trust Cloudflare proxy (required for express-rate-limit behind CDN)
 app.set('trust proxy', 1);
 
-// 1. Security headers
+// 1. Security headers (Helmet + OWASP extras)
 app.use(helmet({
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
   frameguard: { action: 'deny' },
   contentSecurityPolicy: config.NODE_ENV === 'production' ? undefined : false,
 }));
+app.use(securityHeaders);
 
 // 2. CORS
 app.use(createCorsMiddleware());
 
-// 3. Body parsing
+// 3. HTTP Parameter Pollution prevention (OWASP)
+// Doc ref: §Mitigating OWASP API Risks (citation 36)
+app.use(hpp());
+
+// 4. Payload size enforcement
+app.use(enforcePayloadLimits);
+
+// 5. Body parsing
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
-// 4. Correlation ID injection (for request tracing)
+// 6. Input sanitization (blocks NoSQL injection, prototype pollution, path traversal)
+app.use(sanitizeInput);
+
+// 7. Correlation ID injection (for request tracing)
 app.use((req, _res, next) => {
   req.correlationId = (req.headers['x-correlation-id'] as string) ?? uuid();
   next();
