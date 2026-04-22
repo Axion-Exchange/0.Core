@@ -39,10 +39,12 @@ export interface FifoPnLResult {
   sellVolumeFiat: string;
   buyVolumeCrypto: string;
   sellVolumeCrypto: string;
-  // P&L
+  // P&L (EUR)
   realizedPnl: string;
   unrealizedPnl: string;
   totalPnl: string;
+  // P&L (USDT) — EUR P&L converted at each trade's actual sell rate
+  realizedPnlUsdt: string;
   // Pricing
   avgBuyPrice: string;
   avgSellPrice: string;
@@ -120,6 +122,7 @@ export class FifoV2Engine {
     let buyVolumeCrypto = new Decimal('0');
     let sellVolumeCrypto = new Decimal('0');
     let realizedPnl = new Decimal('0');
+    let realizedPnlUsdt = new Decimal('0');
 
     for (const order of allOrders) {
       const cryptoQty = new Decimal(order.amount.toString());
@@ -157,6 +160,10 @@ export class FifoV2Engine {
 
           if (isInPeriod) {
             realizedPnl = realizedPnl.plus(tradePnl);
+            // Convert EUR P&L to USDT using THIS trade's actual sell rate
+            if (pricePerUnit.gt(0)) {
+              realizedPnlUsdt = realizedPnlUsdt.plus(tradePnl.div(pricePerUnit));
+            }
 
             matchedTrades.push({
               sellOrderId: order.id,
@@ -224,6 +231,7 @@ export class FifoV2Engine {
       buyVolumeCrypto: buyVolumeCrypto.toFixed(4),
       sellVolumeCrypto: sellVolumeCrypto.toFixed(4),
       realizedPnl: realizedPnl.toFixed(2),
+      realizedPnlUsdt: realizedPnlUsdt.toFixed(2),
       unrealizedPnl: unrealizedPnl.toFixed(2),
       totalPnl: realizedPnl.plus(unrealizedPnl).toFixed(2),
       avgBuyPrice: avgBuy.toFixed(4),

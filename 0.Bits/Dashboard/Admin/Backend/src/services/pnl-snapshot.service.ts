@@ -28,7 +28,7 @@ export async function computeDailyPnlSnapshot(currency: string, date: Date) {
     create: {
       date: dayStart,
       currency,
-      realizedPnl: parseFloat(result.realizedPnl),
+      realizedPnl: parseFloat(result.realizedPnlUsdt),
       buyCount: result.buyCount,
       sellCount: result.sellCount,
       buyVolume: parseFloat(result.buyVolumeCrypto),
@@ -37,7 +37,7 @@ export async function computeDailyPnlSnapshot(currency: string, date: Date) {
       inventoryQty: parseFloat(result.inventoryQty),
     },
     update: {
-      realizedPnl: parseFloat(result.realizedPnl),
+      realizedPnl: parseFloat(result.realizedPnlUsdt),
       buyCount: result.buyCount,
       sellCount: result.sellCount,
       buyVolume: parseFloat(result.buyVolumeCrypto),
