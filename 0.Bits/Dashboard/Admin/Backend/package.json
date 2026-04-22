@@ -14,7 +14,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "exchange",
@@ -57,9 +59,11 @@
     "@types/node": "^25.6.0",
     "@types/socket.io": "^3.0.1",
     "@types/uuid": "^10.0.0",
+    "@vitest/coverage-v8": "^4.1.5",
     "prisma": "^6.4.1",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
