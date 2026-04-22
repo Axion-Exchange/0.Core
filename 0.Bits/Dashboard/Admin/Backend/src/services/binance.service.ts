@@ -10,7 +10,20 @@ export class BinanceService {
   private enabled: boolean = false;
 
   constructor() {
-    if (config.BINANCE_API_KEY && config.BINANCE_API_SECRET) {
+    const hasRsaKey = config.BINANCE_API_KEY && config.BINANCE_API_PRIVATE_KEY_PATH;
+    const hasHmacKey = config.BINANCE_API_KEY && config.BINANCE_API_SECRET;
+
+    if (hasRsaKey) {
+      // RSA mode: feed PEM private key as the secret for CCXT
+      const privateKeyPem = fs.readFileSync(config.BINANCE_API_PRIVATE_KEY_PATH!, 'utf8');
+      this.client = new ccxt.binance({
+        apiKey: config.BINANCE_API_KEY,
+        secret: privateKeyPem,
+        enableRateLimit: true,
+      });
+      this.enabled = true;
+      logger.info('[BinanceService] Initialized with RSA key authentication.');
+    } else if (hasHmacKey) {
       this.client = new ccxt.binance({
         apiKey: config.BINANCE_API_KEY,
         secret: config.BINANCE_API_SECRET,
@@ -19,68 +32,54 @@ export class BinanceService {
       this.enabled = true;
     } else {
       logger.warn('[BinanceService] BINANCE_API_KEY is missing. CCXT Integration is Disabled.');
-      // Stub it for typescript to compile, but flag to false
       this.client = new ccxt.binance();
     }
   }
 
   /**
-   * Undocumented Binance SAPI endpoint to explicitly extract True Legal Identity
+   * Binance SAPI endpoint to extract True Legal Identity from order details.
+   * Uses RSA-SHA256 signing with JSON body + query string signature (the only working format).
    */
   async fetchTrueLegalName(orderNumber: string): Promise<{ buyerName?: string, sellerName?: string, createTime?: number } | null> {
     if (!this.enabled) return null;
     
     try {
-      let buyerName, sellerName, createTime;
-
-      if (config.BINANCE_API_PRIVATE_KEY_PATH) {
-        // Authenticate with RSA if configured
-        const privateKey = fs.readFileSync(config.BINANCE_API_PRIVATE_KEY_PATH, 'utf8');
-        const timestamp = Date.now();
-        const payload = \`adOrderNo=\${orderNumber}&timestamp=\${timestamp}\`;
-        
-        const signer = crypto.createSign('RSA-SHA256');
-        signer.update(payload);
-        signer.end();
-        const signature = encodeURIComponent(signer.sign(privateKey, 'base64'));
-        
-        const finalBody = \`\${payload}&signature=\${signature}\`;
-        
-        const rawRes = await fetch(\`https://api.binance.com/sapi/v1/c2c/orderMatch/getUserOrderDetail\`, {
-            method: 'POST',
-            headers: {
-              'X-MBX-APIKEY': config.BINANCE_API_KEY!,
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: finalBody
-        });
-        
-        const json = await rawRes.json();
-        
-        if (json && json.data) {
-          buyerName = json.data.buyerName;
-          sellerName = json.data.sellerName;
-          createTime = json.data.createTime;
-        }
-      } else {
-         // Fallback to standard CCXT implicit integration (Throws -1000 without RSA Whitelist)
-         const json = await this.client.request('c2c/orderMatch/getUserOrderDetail', 'sapi', 'POST', {
-            adOrderNo: orderNumber
-         });
-         if (json && json.data) {
-             buyerName = json.data.buyerName;
-             sellerName = json.data.sellerName;
-             createTime = json.data.createTime;
-         }
+      if (!config.BINANCE_API_PRIVATE_KEY_PATH) {
+        logger.warn('[BinanceService] RSA key not configured, cannot fetch real names');
+        return null;
       }
+
+      const privateKey = fs.readFileSync(config.BINANCE_API_PRIVATE_KEY_PATH, 'utf8');
+      const timestamp = Date.now();
+      const queryPayload = `timestamp=${timestamp}`;
       
-      if (buyerName || sellerName || createTime) {
+      // RSA-SHA256 sign the query string only
+      const signer = crypto.createSign('RSA-SHA256');
+      signer.update(queryPayload);
+      signer.end();
+      const signature = encodeURIComponent(signer.sign(privateKey, 'base64'));
+      
+      // adOrderNo goes in JSON body, timestamp+signature in query string
+      const rawRes = await fetch(`https://api.binance.com/sapi/v1/c2c/orderMatch/getUserOrderDetail?${queryPayload}&signature=${signature}`, {
+          method: 'POST',
+          headers: {
+            'X-MBX-APIKEY': config.BINANCE_API_KEY!,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ adOrderNo: orderNumber })
+      });
+      
+      const json: any = await rawRes.json();
+      
+      if (json && json.code === '000000' && json.data) {
         return {
-          buyerName: buyerName || undefined,
-          sellerName: sellerName || undefined,
-          createTime: createTime || undefined
+          buyerName: json.data.buyerName || undefined,
+          sellerName: json.data.sellerName || undefined,
+          createTime: json.data.createTime || undefined
         };
       }
+      
+      logger.warn(`[BinanceService] getUserOrderDetail returned: ${json?.code} ${json?.msg || json?.message}`);
       return null;
     } catch(err) {
       logger.error(`[BinanceService] fetchTrueLegalName error for ${orderNumber}:`, err);

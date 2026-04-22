@@ -415,7 +415,7 @@ export class FiatService {
 
     // Januar (EUR SEPA)
     if (this.januar.enabled) {
-      const januarTxs = await this.januar.getTransactions(50);
+      const januarTxs = await this.januar.getTransactions();
       allTxs.push(...januarTxs);
     }
 

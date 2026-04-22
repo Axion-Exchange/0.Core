@@ -9,3 +9,14 @@ logs
 
 # Prisma generated
 /generated/prisma
+binance_rsa_private.pem
+binance_rsa_public.pem
+*.log
+check-*.ts
+cleanup-*.ts
+count-*.ts
+final-cleanup.ts
+resolve-*.ts
+resolver-*.ts
+run-*.ts
+test-*.ts
