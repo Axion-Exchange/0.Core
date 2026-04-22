@@ -83,6 +83,18 @@ boot().catch((err) => {
   process.exit(1);
 });
 
+// ── Health Check Worker ────────────────────────────────
+createWorker(QUEUE_NAMES.HEALTH_CHECK, async () => {
+  log.info("[HealthCheck] Running infrastructure probes...");
+  const results = await runAllHealthChecks();
+  const failures = results.filter(r => r.status !== "healthy");
+  if (failures.length > 0) {
+    log.warn("[HealthCheck] " + failures.length + " service(s) degraded/down: " + failures.map(f => f.service).join(", "));
+  } else {
+    log.info("[HealthCheck] All " + results.length + " services healthy");
+  }
+});
+
 // ── Graceful Shutdown ────────────────────────────────────────────────────────
 
 async function shutdown(signal: string) {

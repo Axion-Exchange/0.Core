@@ -1,4 +1,5 @@
 import { prisma } from '../lib/db.js';
+import { safeTransaction } from '../lib/transaction.js';
 import { encrypt, decrypt } from '../lib/crypto.js';
 import { NotFoundError } from '../middleware/error.js';
 import type { AdStatus, OrderStatus, DisputeStatus, Prisma } from '@prisma/client';
@@ -184,16 +185,25 @@ export class P2PService {
   }
 
   async resolveDispute(id: string, data: { resolution: string; resolvedInFavor: string; adminId: string }) {
-    return prisma.p2PDispute.update({
-      where: { id },
-      data: {
-        status: data.resolvedInFavor === 'buyer' ? 'RESOLVED_BUYER' : 'RESOLVED_SELLER',
-        resolution: data.resolution,
-        resolvedInFavor: data.resolvedInFavor,
-        resolvedAt: new Date(),
-        assignedToId: data.adminId,
-      },
-    });
+    // Atomic: resolve dispute + update linked order status in one transaction
+    return safeTransaction(async (tx) => {
+      const dispute = await tx.p2PDispute.update({
+        where: { id },
+        data: {
+          status: data.resolvedInFavor === 'buyer' ? 'RESOLVED_BUYER' : 'RESOLVED_SELLER',
+          resolution: data.resolution,
+          resolvedInFavor: data.resolvedInFavor,
+          resolvedAt: new Date(),
+          assignedToId: data.adminId,
+        },
+      });
+      // Also close the linked order atomically
+      await tx.p2POrder.update({
+        where: { id: dispute.orderId },
+        data: { status: data.resolvedInFavor === 'buyer' ? 'CANCELLED' : 'COMPLETED', completedAt: new Date() },
+      });
+      return dispute;
+    }, { label: 'resolve-dispute' });
   }
 
   // ── Payment Methods ────────────────────────────────────

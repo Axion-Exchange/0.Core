@@ -81,8 +81,9 @@ async function probeRedis(): Promise<ProbeResult> {
   const start = Date.now();
   try {
     // Use dynamic import to avoid circular dependencies
-    const { default: Redis } = await import("ioredis");
-    const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+    const ioredis = await import("ioredis");
+    const RedisClient = (ioredis as any).default || (ioredis as any).Redis;
+    const redis = new (RedisClient as any)(process.env.REDIS_URL || "redis://localhost:6379", {
       connectTimeout: 5000,
       lazyConnect: true,
     });
@@ -218,8 +219,9 @@ async function probeBullMQ(): Promise<ProbeResult> {
   const start = Date.now();
   try {
     // Check if the BullMQ queues exist by querying Redis for bull:* keys
-    const { default: Redis } = await import("ioredis");
-    const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+    const ioredis = await import("ioredis");
+    const RedisClient = (ioredis as any).default || (ioredis as any).Redis;
+    const redis = new (RedisClient as any)(process.env.REDIS_URL || "redis://localhost:6379", {
       connectTimeout: 5000,
       lazyConnect: true,
     });
