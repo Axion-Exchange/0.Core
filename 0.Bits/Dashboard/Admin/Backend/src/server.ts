@@ -30,6 +30,7 @@ import { pearRouter } from './routes/pear.router.js';
 import { fiatRouter } from './routes/fiat.router.js';
 import { reconciliationRouter } from './routes/reconciliation.router.js';
 import { currencyLedgerRouter } from './routes/currency-ledger.router.js';
+import { kycWebhookRouter } from './routes/kyc-webhook.router.js';
 import { orchestratorWorker } from './workers/p2p.worker.js';
 import { pearDbSyncWorker } from './workers/pear-db-sync.worker.js';
 import { binanceSyncWorker } from './workers/binance-sync.worker.js';
@@ -107,6 +108,7 @@ app.use('/api/v1/kyc', authLimiter, kycRouter);
 app.use('/api/v1/pear', authLimiter, pearRouter);
 app.use('/api/v1/reconciliation', authLimiter, reconciliationRouter);
 app.use('/api/v1/fiat', publicLimiter, fiatRouter); // Webhooks are authenticated via HMAC signature, not JWT
+app.use('/api/v1/kyc', publicLimiter, kycWebhookRouter); // Didit webhooks authenticated via HMAC, not JWT
 
 // ── 404 Handler ──────────────────────────────────────
 

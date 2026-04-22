@@ -253,6 +253,7 @@ model KycProvider {
   provider      String   // Provider type: "DIDIT", "SUMSUB", "ONFIDO"
   appId         String   // Provider-specific app/client ID
   apiKey        String   // API key
+  webhookSecret String?  // HMAC secret for webhook signature verification
   baseUrl       String   @default("https://verification.didit.me/v3")
   isActive      Boolean  @default(true)
   metadata      Json?    // Extra provider-specific config

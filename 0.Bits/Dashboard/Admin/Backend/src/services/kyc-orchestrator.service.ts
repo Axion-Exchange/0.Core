@@ -606,7 +606,7 @@ export class KycOrchestratorService {
     });
   }
 
-  private mapStatus(s: string): KYCStatus {
+  mapStatus(s: string): KYCStatus {
     const upper = s.toUpperCase();
     if (upper === 'APPROVED') return KYCStatus.APPROVED;
     if (upper === 'DECLINED' || upper === 'REJECTED') return KYCStatus.REJECTED;

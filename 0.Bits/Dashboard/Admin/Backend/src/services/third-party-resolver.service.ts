@@ -265,13 +265,13 @@ export class ThirdPartyResolverService {
       // Compare names
       const isSamePerson = namesSimilar(binanceName, kycName);
 
-      // Check Januar for payment verification
+      // Check Januar for payment verification (name match + IBAN cross-ref)
       let januarMatch = false;
       let januarSenderName: string | null = null;
       let januarAmount: string | null = null;
 
       if (!isSamePerson) {
-        // Look for a Januar PAYIN matching the KYC name
+        // Strategy 1: Name match on Januar sender
         for (const txn of januarTxns) {
           const meta = txn.metadata as any;
           const senderName = meta?.senderName || meta?.counterparty?.name || txn.description || '';
@@ -287,6 +287,42 @@ export class ThirdPartyResolverService {
               januarSenderName = senderName;
               januarAmount = txn.amount.toString();
               break;
+            }
+          }
+        }
+
+        // Strategy 2: IBAN cross-referencing
+        // If the same IBAN sent multiple payments, map repeat payers
+        if (!januarMatch) {
+          // Build IBAN → payment history map
+          const ibanPayments = new Map<string, { senderName: string; amounts: number[]; count: number }>();
+          for (const txn of januarTxns) {
+            const meta = txn.metadata as any;
+            const iban = meta?.senderIban || meta?.counterparty?.accountNumber || '';
+            const senderName = meta?.senderName || meta?.counterparty?.name || txn.description || '';
+            if (!iban || !senderName) continue;
+
+            if (!ibanPayments.has(iban)) {
+              ibanPayments.set(iban, { senderName, amounts: [], count: 0 });
+            }
+            const entry = ibanPayments.get(iban)!;
+            entry.amounts.push(parseFloat(txn.amount.toString()));
+            entry.count++;
+          }
+
+          // Check if the KYC name matches any IBAN sender
+          for (const [iban, data] of ibanPayments) {
+            if (namesSimilar(kycName, data.senderName)) {
+              // Found IBAN whose sender matches KYC name
+              // Check if any payment amount matches this order
+              const orderAmount = parseFloat(extraction.amount);
+              const matchingAmount = data.amounts.find(a => Math.abs(a - orderAmount) <= orderAmount * 0.15);
+              if (matchingAmount) {
+                januarMatch = true;
+                januarSenderName = `${data.senderName} (IBAN: ${iban.substring(0, 8)}...)`;
+                januarAmount = matchingAmount.toString();
+                break;
+              }
             }
           }
         }
