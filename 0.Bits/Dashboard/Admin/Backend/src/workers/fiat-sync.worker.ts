@@ -76,6 +76,7 @@ class FiatSyncWorker {
           where: {
             fiat: bal.currency,
             status: { in: ['PENDING_FIAT', 'FIAT_RECEIVED', 'PENDING_RELEASE', 'APPEALING'] },
+            type: 'SELL',
           },
           _sum: { fiatAmount: true },
         });
