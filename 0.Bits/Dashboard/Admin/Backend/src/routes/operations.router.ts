@@ -1,14 +1,33 @@
 import { Router } from 'express';
 import { operationsService } from '../services/operations.service.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, requireRole } from '../middleware/auth.js';
 import { auditLog } from '../middleware/audit.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate.js';
 import { idParamSchema, param } from '../validators/common.schema.js';
 import { createApiKeySchema, registerNodeSchema, nodeHeartbeatSchema, logQuerySchema } from '../validators/operations.schema.js';
 import { sendSuccess, sendPaginated } from '../lib/response.js';
+import { getHealthDashboard, runAllHealthChecks, getServiceHistory } from '../services/health-checker.service.js';
 import { buildPaginationMeta } from '../lib/pagination.js';
 
 const router = Router();
+
+// ── Health Dashboard (public read, auth required for mutations) ──
+
+router.get('/health/dashboard', optionalAuth, async (_req, res, next) => {
+  try {
+    const dashboard = await getHealthDashboard();
+    sendSuccess(res, dashboard);
+  } catch (err) { next(err); }
+});
+
+router.get('/health/history/:service', optionalAuth, async (req, res, next) => {
+  try {
+    const history = await getServiceHistory(req.params.service, 30);
+    sendSuccess(res, history);
+  } catch (err) { next(err); }
+});
+
+// ── All routes below require authentication ─────────────────
 router.use(requireAuth);
 
 // ── Health ───────────────────────────────────────────
@@ -80,28 +99,13 @@ router.get('/logs', validateQuery(logQuerySchema), async (req, res, next) => {
 });
 
 
-// ── Health Dashboard (Institutional Monitoring) ──────
 
-import { getHealthDashboard, runAllHealthChecks, getServiceHistory } from '../services/health-checker.service.js';
-
-router.get('/health/dashboard', async (_req, res, next) => {
-  try {
-    const dashboard = await getHealthDashboard();
-    sendSuccess(res, dashboard);
-  } catch (err) { next(err); }
-});
+// ── Health Mutation (admin only) ───────────────────────
 
 router.post('/health/run', requireRole('ADMIN', 'SUPER_ADMIN'), async (_req, res, next) => {
   try {
     const results = await runAllHealthChecks();
     sendSuccess(res, results);
-  } catch (err) { next(err); }
-});
-
-router.get('/health/history/:service', async (req, res, next) => {
-  try {
-    const history = await getServiceHistory(req.params.service, 30);
-    sendSuccess(res, history);
   } catch (err) { next(err); }
 });
 
