@@ -133,3 +133,31 @@ opsExtRouter.get("/pnl/v2/:currency", async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
+
+// ── P&L Daily Snapshots ─────────────────────────────────────────────────────
+
+import { getPnlTimeSeries, backfillPnlSnapshots, computeDailyPnlSnapshot } from "../services/pnl-snapshot.service.js";
+
+/** GET /operations/pnl/daily — Daily P&L time-series for charts */
+opsExtRouter.get("/pnl/daily", async (req: Request, res: Response) => {
+  try {
+    const currency = ((req.query.currency as string) || "EUR").toUpperCase();
+    const days = parseInt((req.query.days as string) || "180", 10);
+    const snapshots = await getPnlTimeSeries(currency, days);
+    res.json({ success: true, data: snapshots });
+  } catch (err) {
+    res.status(500).json({ success: false, error: (err as Error).message });
+  }
+});
+
+/** POST /operations/pnl/backfill — Trigger backfill of historical P&L snapshots */
+opsExtRouter.post("/pnl/backfill", async (req: Request, res: Response) => {
+  try {
+    const currency = ((req.body.currency as string) || "EUR").toUpperCase();
+    const days = parseInt((req.body.days as string) || "180", 10);
+    const count = await backfillPnlSnapshots(days, currency);
+    res.json({ success: true, data: { snapshotsCreated: count, currency, days } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: (err as Error).message });
+  }
+});

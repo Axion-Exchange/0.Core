@@ -832,3 +832,20 @@ model Task {
   @@index([priority])
   @@map("tasks")
 }
+
+model PnlSnapshot {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date        DateTime @db.Date
+  currency    String   @db.VarChar(10) // EUR, COP, GBP, MXN
+  realizedPnl Decimal  @default(0) @db.Decimal(24, 8)
+  buyCount    Int      @default(0)
+  sellCount   Int      @default(0)
+  buyVolume   Decimal  @default(0) @db.Decimal(24, 8)
+  sellVolume  Decimal  @default(0) @db.Decimal(24, 8)
+  spreadPct   Decimal  @default(0) @db.Decimal(10, 4)
+  inventoryQty Decimal @default(0) @db.Decimal(24, 8)
+  createdAt   DateTime @default(now())
+
+  @@unique([date, currency])
+  @@map("pnl_snapshots")
+}

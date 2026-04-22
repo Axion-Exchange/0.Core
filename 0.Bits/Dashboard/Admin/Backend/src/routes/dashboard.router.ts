@@ -70,3 +70,27 @@ router.post('/orders/:orderId/sync-chat', async (req, res, next) => {
 });
 
 export { router as dashboardRouter };
+
+// ── Daily P&L chart data (public, consumed by frontend Overview) ────────────
+import { getPnlTimeSeries } from "../services/pnl-snapshot.service.js";
+
+router.get("/pnl-daily", async (req, res, next) => {
+  try {
+    const currency = ((req.query.currency as string) || "EUR").toUpperCase();
+    const days = parseInt((req.query.days as string) || "180", 10);
+    const snapshots = await getPnlTimeSeries(currency, days);
+    
+    // Map to chart-friendly format
+    const chartData = snapshots.map((s: any) => ({
+      date: new Date(s.date).toISOString().split("T")[0],
+      pnl: Number(s.realizedPnl),
+      buyVolume: Number(s.buyVolume),
+      sellVolume: Number(s.sellVolume),
+      spread: Number(s.spreadPct),
+      buyCount: s.buyCount,
+      sellCount: s.sellCount,
+    }));
+    
+    res.json({ success: true, data: chartData });
+  } catch (err) { next(err); }
+});
