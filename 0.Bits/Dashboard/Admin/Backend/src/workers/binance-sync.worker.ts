@@ -203,6 +203,70 @@ class BinanceSyncWorker {
       log.error(`Binance sync iteration failed:`, err.message);
     } finally {
       this.isRunning = false;
+      // Run stale order reconciliation after sync (throttled to every 10th tick)
+      this.reconcileStaleOrders().catch(e => log.warn('Reconciliation error:', e.message));
+    }
+  }
+
+  /**
+   * Reconcile orders stuck in non-terminal states by re-fetching
+   * paginated Binance history. Runs every 10th tick (~5 min).
+   */
+  private tickCount = 0;
+  private async reconcileStaleOrders() {
+    this.tickCount++;
+    if (this.tickCount % 10 !== 0) return; // Only run every 10th tick
+
+    try {
+      // Find orders in non-terminal states older than 1 hour
+      const staleOrders = await prisma.p2POrder.findMany({
+        where: {
+          status: { in: ['PENDING_FIAT', 'FIAT_RECEIVED', 'PENDING_RELEASE'] },
+          createdAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+        },
+        select: { externalOrderId: true },
+        take: 200,
+      });
+
+      if (staleOrders.length === 0) return;
+
+      const staleIds = new Set(staleOrders.map(o => o.externalOrderId).filter(Boolean));
+      log.info(`Reconciling ${staleIds.size} stale pending orders...`);
+
+      // Fetch up to 5 pages of Binance history to find updated statuses
+      for (let page = 1; page <= 5; page++) {
+        try {
+          const response: any = await (binanceService as any).client.sapiGetC2cOrderMatchListUserOrderHistory({ page, rows: 100 });
+          if (!response?.data?.length) break;
+
+          for (const order of response.data) {
+            if (!staleIds.has(order.orderNumber)) continue;
+
+            let newStatus: OrderStatus | null = null;
+            if (order.orderStatus === 'COMPLETED') newStatus = OrderStatus.COMPLETED;
+            else if (order.orderStatus === 'CANCELLED' || order.orderStatus === 'CANCELLED_BY_SYSTEM') newStatus = OrderStatus.CANCELLED;
+
+            if (newStatus) {
+              await prisma.p2POrder.update({
+                where: { externalOrderId: order.orderNumber },
+                data: {
+                  status: newStatus,
+                  ...(newStatus === OrderStatus.COMPLETED ? { completedAt: new Date() } : {}),
+                },
+              });
+              staleIds.delete(order.orderNumber);
+              log.info(`Reconciled ${order.orderNumber} → ${newStatus}`);
+            }
+          }
+
+          if (staleIds.size === 0) break;
+        } catch (pageErr: any) {
+          log.warn(`Reconciliation page ${page} failed: ${pageErr.message}`);
+          break;
+        }
+      }
+    } catch (err: any) {
+      log.error(`Stale order reconciliation failed:`, err.message);
     }
   }
 }

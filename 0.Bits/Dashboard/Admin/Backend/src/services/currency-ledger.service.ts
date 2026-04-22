@@ -108,12 +108,13 @@ export class CurrencyLedgerService {
     const dateFrom = from || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
     const dateTo = to || new Date();
 
-    // 1. Get ALL counterparties who traded BEFORE the date range
+    // 1. Get counterparties who COMPLETED an order BEFORE the date range
     //    so we can identify truly "new" ones within the range
     const historicalCounterparties = await prisma.p2POrder.findMany({
       where: {
         fiat,
         createdAt: { lt: dateFrom },
+        status: 'COMPLETED',
       },
       select: {
         counterpartyName: true,
