@@ -29,6 +29,7 @@ import { kycRouter } from './routes/kyc.router.js';
 import { pearRouter } from './routes/pear.router.js';
 import { fiatRouter } from './routes/fiat.router.js';
 import { reconciliationRouter } from './routes/reconciliation.router.js';
+import { currencyLedgerRouter } from './routes/currency-ledger.router.js';
 import { orchestratorWorker } from './workers/p2p.worker.js';
 import { pearDbSyncWorker } from './workers/pear-db-sync.worker.js';
 import { binanceSyncWorker } from './workers/binance-sync.worker.js';
@@ -93,6 +94,7 @@ app.use('/api/v1/auth', publicLimiter, authRouter);
 
 app.use('/api/v1/p2p', authLimiter, p2pRouter);
 app.use('/api/v1/treasury', authLimiter, treasuryRouter);
+app.use('/api/v1/treasury/currency', authLimiter, currencyLedgerRouter);
 app.use('/api/v1/users', authLimiter, usersRouter);
 app.use('/api/v1/operations', authLimiter, operationsRouter);
 app.use('/api/v1/compliance', authLimiter, complianceRouter);
