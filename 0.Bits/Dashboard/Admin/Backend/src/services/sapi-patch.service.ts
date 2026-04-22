@@ -60,8 +60,8 @@ class SapiPatchService {
 
       // Chronologically organize the orders strictly by their numerical Binance ID string which logically always implicitly increments over time natively
       const chronologicallySortedOrders = orders
-         .filter(o => o.externalOrderId)
-         .sort((a, b) => a.externalOrderId!.localeCompare(b.externalOrderId!));
+         .filter((o: any) => o.externalOrderId)
+         .sort((a: any, b: any) => a.externalOrderId!.localeCompare(b.externalOrderId!));
 
       if (chronologicallySortedOrders.length === 0) continue;
 

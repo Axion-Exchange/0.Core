@@ -162,7 +162,7 @@ export class ReconciliationService {
           if (needsOwnerCorrection && wasPreviouslyCompleted) {
             // Subtract from wrong old user (the masked master)
             await tx.user.update({
-               where: { id: existingOrder.userId },
+               where: { id: existingOrder.userId ?? undefined },
                data: {
                  totalVolume: { decrement: existingOrder.amount },
                  totalTrades: { decrement: 1 }

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/db.js';
 import { config } from '../config/index.js';
 import { sha256 } from '../lib/crypto.js';
+import { blacklistToken, revokeAllTokensForAdmin } from '../lib/redis.js';
 import { AuthenticationError, ConflictError, NotFoundError } from '../middleware/error.js';
 import type { JwtPayload } from '../types/index.js';
 import type { Admin } from '@prisma/client';
@@ -61,15 +62,18 @@ export class AuthService {
 
     // Create session
     const sessionId = crypto.randomUUID();
+    const jti = crypto.randomUUID(); // Unique token ID for blacklisting (doc §Session Revocation, citation 15)
     const payload: JwtPayload = {
       sub: admin.id,
       email: admin.email,
       role: admin.role,
       sessionId,
+      jti,
     };
 
     const token = jwt.sign(payload, config.JWT_SECRET, {
       expiresIn: config.JWT_EXPIRES_IN as any,
+      jwtid: jti,
     });
 
     const tokenHash = sha256(token);
@@ -95,8 +99,18 @@ export class AuthService {
 
   /**
    * Revoke a session (logout).
+   * Blacklists the JWT in Redis for its remaining validity.
+   * Doc ref: §Session Revocation and JWT Blacklisting (citation 15)
    */
-  async logout(sessionId: string) {
+  async logout(sessionId: string, jti?: string, tokenExp?: number) {
+    // Blacklist the JWT in Redis so it's rejected immediately
+    if (jti && tokenExp) {
+      const remainingSeconds = Math.max(0, tokenExp - Math.floor(Date.now() / 1000));
+      if (remainingSeconds > 0) {
+        await blacklistToken(jti, remainingSeconds);
+      }
+    }
+
     await prisma.session.update({
       where: { id: sessionId },
       data: { revokedAt: new Date() },
@@ -133,11 +147,15 @@ export class AuthService {
       data: { passwordHash },
     });
 
-    // Revoke all sessions
+    // Revoke all sessions in DB
     await prisma.session.updateMany({
       where: { adminId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+
+    // Revoke all tokens in Redis (instant invalidation)
+    // Doc ref: §Session Revocation (citation 15)
+    await revokeAllTokensForAdmin(adminId);
   }
 
   /**

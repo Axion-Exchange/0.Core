@@ -84,7 +84,7 @@ export class ComplianceService {
       take: limit,
     });
 
-    return orders.map((row) => ({
+    return orders.map((row: any) => ({
       counterparty: row.counterparty,
       totalFiatVolume: Number(row._sum.fiatAmount ?? 0),
       totalCryptoVolume: Number(row._sum.amount ?? 0),
@@ -110,7 +110,7 @@ export class ComplianceService {
       take: 10000, // Safety cap
     });
 
-    return logs.map((log) => ({
+    return logs.map((log: any) => ({
       timestamp: log.createdAt.toISOString(),
       admin: log.admin?.displayName ?? log.adminId,
       action: log.action,

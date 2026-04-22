@@ -6,6 +6,7 @@ import { v4 as uuid } from 'uuid';
 import { config } from './config/index.js';
 import { createLogger } from './lib/logger.js';
 import { checkDatabaseHealth, disconnectDatabase } from './lib/db.js';
+import { disconnectRedis } from './lib/redis.js';
 import { sendSuccess, sendError } from './lib/response.js';
 import { initSocket } from './lib/socket.js';
 
@@ -168,8 +169,9 @@ async function shutdown(signal: string) {
     chatSyncWorker.stop();
     fiatSyncWorker.stop();
     kycSyncWorker.stop();
+    await disconnectRedis();
     await disconnectDatabase();
-    log.info('Database disconnected');
+    log.info('All connections closed');
     process.exit(0);
   });
 

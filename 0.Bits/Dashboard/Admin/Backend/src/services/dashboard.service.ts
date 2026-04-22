@@ -152,7 +152,7 @@ export class DashboardService {
         totalTrades: Number(user.totalTrades || 0),
         riskScore: user.riskScore
       },
-      transactions: user.orders.map(order => ({
+      transactions: user.orders.map((order: any) => ({
         id: order.id,
         externalOrderId: order.externalOrderId,
         asset: order.asset,

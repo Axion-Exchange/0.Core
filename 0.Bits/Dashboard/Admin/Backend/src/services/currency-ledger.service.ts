@@ -237,7 +237,7 @@ export class CurrencyLedgerService {
     // Map to Usage[] format the DataTable expects
     // Pending = open order on Binance (awaiting fiat/release)
     // Completed = trade fully settled
-    const usage = orders.map(order => {
+    const usage = orders.map((order: any) => {
       const isCompleted = order.status === 'COMPLETED' || order.status === 'RELEASED';
       const displayStatus = isCompleted ? 'Completed' : 'Pending';
 

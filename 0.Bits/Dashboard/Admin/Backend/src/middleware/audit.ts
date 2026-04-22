@@ -46,7 +46,7 @@ export function auditLog(req: Request, res: Response, next: NextFunction): void 
           duration,
           correlationId: req.correlationId ?? null,
         },
-      }).catch((err) => {
+      }).catch((err: unknown) => {
         log.error('Failed to write audit log', { error: (err as Error).message });
       });
     }

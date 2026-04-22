@@ -10,7 +10,7 @@ export class TreasuryService {
       orderBy: { currency: 'asc' },
     });
 
-    const totalUsd = portfolios.reduce((sum, p) => sum + Number(p.totalBalance), 0);
+    const totalUsd = portfolios.reduce((sum: number, p: any) => sum + Number(p.totalBalance), 0);
 
     return { portfolios, totalUsd };
   }
@@ -186,7 +186,7 @@ export class TreasuryService {
       const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
       
       const chartRow: any = { date: dateStr };
-      fiatLedgers.forEach(ledg => {
+      fiatLedgers.forEach((ledg: any) => {
          const key = `${ledg.source?.toUpperCase() || 'EXTERNAL'} - ${ledg.currency}`;
          // Fuzz historical data tightly around the current balance mathematically
          const fuzzed = Number(ledg.balance) * (1 + (Math.random() * 0.2 - 0.1));
@@ -196,10 +196,10 @@ export class TreasuryService {
     }
     
     // Categories
-    const categories = fiatLedgers.map(l => `${l.source?.toUpperCase() || 'EXTERNAL'} - ${l.currency}`);
+    const categories = fiatLedgers.map((l: any) => `${l.source?.toUpperCase() || 'EXTERNAL'} - ${l.currency}`);
 
     return {
-      totalUsd: fiatLedgers.reduce((acc, curr) => acc + Number(curr.balance), 0),
+      totalUsd: fiatLedgers.reduce((acc: number, curr: any) => acc + Number(curr.balance), 0),
       summary: summaryBuckets,
       chartData: data,
       categories: categories,

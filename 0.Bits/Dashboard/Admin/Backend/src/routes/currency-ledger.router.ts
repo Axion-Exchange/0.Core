@@ -16,11 +16,11 @@ router.use(optionalAuth);
 const VALID_FIATS = ['EUR', 'COP', 'MXN'];
 
 // GET /currency/:fiat/summary — Balance card data
-router.get('/:fiat/summary', async (req, res, next) => {
+router.get('/:fiat/summary', async (req, res, next): Promise<void> => {
   try {
     const fiat = req.params.fiat?.toUpperCase();
     if (!VALID_FIATS.includes(fiat)) {
-      return res.status(400).json({ success: false, error: { code: 'INVALID_FIAT', message: `Supported: ${VALID_FIATS.join(', ')}` }});
+      res.status(400).json({ success: false, error: { code: 'INVALID_FIAT', message: `Supported: ${VALID_FIATS.join(', ')}` }});
     }
     const summary = await currencyLedgerService.getBalanceSummary(fiat);
     sendSuccess(res, summary);
@@ -28,11 +28,11 @@ router.get('/:fiat/summary', async (req, res, next) => {
 });
 
 // GET /currency/:fiat/metrics — Daily chart card data
-router.get('/:fiat/metrics', async (req, res, next) => {
+router.get('/:fiat/metrics', async (req, res, next): Promise<void> => {
   try {
     const fiat = req.params.fiat?.toUpperCase();
     if (!VALID_FIATS.includes(fiat)) {
-      return res.status(400).json({ success: false, error: { code: 'INVALID_FIAT', message: `Supported: ${VALID_FIATS.join(', ')}` }});
+      res.status(400).json({ success: false, error: { code: 'INVALID_FIAT', message: `Supported: ${VALID_FIATS.join(', ')}` }});
     }
     const from = req.query.from ? new Date(req.query.from as string) : undefined;
     const to = req.query.to ? new Date(req.query.to as string) : undefined;
@@ -42,11 +42,11 @@ router.get('/:fiat/metrics', async (req, res, next) => {
 });
 
 // GET /currency/:fiat/orders — P2P orders table
-router.get('/:fiat/orders', async (req, res, next) => {
+router.get('/:fiat/orders', async (req, res, next): Promise<void> => {
   try {
     const fiat = req.params.fiat?.toUpperCase();
     if (!VALID_FIATS.includes(fiat)) {
-      return res.status(400).json({ success: false, error: { code: 'INVALID_FIAT', message: `Supported: ${VALID_FIATS.join(', ')}` }});
+      res.status(400).json({ success: false, error: { code: 'INVALID_FIAT', message: `Supported: ${VALID_FIATS.join(', ')}` }});
     }
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const page = parseInt(req.query.page as string) || 1;

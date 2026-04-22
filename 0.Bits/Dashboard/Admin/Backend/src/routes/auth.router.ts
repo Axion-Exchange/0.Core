@@ -19,11 +19,13 @@ router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res, 
   } catch (err) { next(err); }
 });
 
-// POST /logout — Revoke session
+// POST /logout — Revoke session + blacklist JWT in Redis
 router.post('/logout', requireAuth, async (req, res, next) => {
   try {
     if (req.admin?.sessionId) {
-      await authService.logout(req.admin.sessionId);
+      const jti = (req.admin as any).jti || req.admin.sessionId;
+      const exp = (req.admin as any).exp;
+      await authService.logout(req.admin.sessionId, jti, exp);
     }
     sendSuccess(res, { message: 'Logged out successfully' });
   } catch (err) { next(err); }

@@ -89,11 +89,11 @@ function levenshtein(s1: string, s2: string): number {
   for (let i = 0; i < s1.length; i++) {
     const curr = [i + 1];
     for (let j = 0; j < s2.length; j++) {
-      curr.push(Math.min(prev[j + 1] + 1, curr[j] + 1, prev[j] + (s1[i] !== s2[j] ? 1 : 0)));
+      curr.push(Math.min(prev[j + 1]! + 1, curr[j]! + 1, prev[j]! + (s1[i] !== s2[j] ? 1 : 0)));
     }
     prev = curr;
   }
-  return prev[s2.length];
+  return prev[s2.length]!;
 }
 
 function namesSimilar(nameA: string, nameB: string): boolean {

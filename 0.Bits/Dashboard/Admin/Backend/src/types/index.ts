@@ -8,6 +8,7 @@ export interface JwtPayload {
   email: string;
   role: Role;
   sessionId: string;
+  jti?: string;       // Unique token identifier for blacklisting
   iat?: number;
   exp?: number;
 }

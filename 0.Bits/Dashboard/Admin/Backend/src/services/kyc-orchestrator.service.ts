@@ -70,7 +70,7 @@ function normalizeAndSplit(name: string): string[] {
   for (const w of rawWords) {
     const initials = w.match(/([a-z])\./g);
     if (initials && w.length <= initials.length * 2 + 1) {
-      for (const init of initials) expanded.push(init[0]);
+      for (const init of initials) expanded.push(init[0]!);
     } else {
       const clean = w.replace(/\.+$/, '');
       if (clean) expanded.push(clean);
@@ -88,14 +88,14 @@ function levenshtein(s1: string, s2: string): number {
     const curr = [i + 1];
     for (let j = 0; j < s2.length; j++) {
       curr.push(Math.min(
-        prev[j + 1] + 1,
-        curr[j] + 1,
-        prev[j] + (s1[i] !== s2[j] ? 1 : 0),
+        prev[j + 1]! + 1,
+        curr[j]! + 1,
+        prev[j]! + (s1[i] !== s2[j] ? 1 : 0),
       ));
     }
     prev = curr;
   }
-  return prev[s2.length];
+  return prev[s2.length]!;
 }
 
 /**
@@ -284,7 +284,7 @@ export class KycOrchestratorService {
       include: { _count: { select: { sessions: true } } },
       orderBy: { createdAt: 'asc' },
     });
-    return providers.map(p => ({
+    return providers.map((p: any) => ({
       id: p.id,
       name: p.name,
       provider: p.provider,
@@ -307,7 +307,7 @@ export class KycOrchestratorService {
 
     // Fetch from all providers concurrently
     const results = await Promise.allSettled(
-      providers.map(async (prov) => {
+      providers.map(async (prov: any) => {
         let sessions: ProviderSession[] = [];
 
         if (prov.provider === 'DIDIT') {
@@ -573,7 +573,7 @@ export class KycOrchestratorService {
 
     return {
       status: bestStatus,
-      sessions: sessions.map(s => ({
+      sessions: sessions.map((s: any) => ({
         provider: s.provider.name,
         providerType: s.provider.provider,
         sessionId: s.externalId,

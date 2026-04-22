@@ -262,7 +262,7 @@ class IdentityResolverService {
 
     if (orphans.length > 0) {
       await prisma.user.deleteMany({
-        where: { id: { in: orphans.map(o => o.id) } }
+        where: { id: { in: orphans.map((o: any) => o.id) } }
       });
       log.info(`[IdentityResolver] Cleaned up ${orphans.length} orphaned user nodes.`);
     }

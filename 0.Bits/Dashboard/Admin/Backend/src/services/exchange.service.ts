@@ -52,7 +52,7 @@ export class ExchangeService {
     await this.loadClients();
     const accounts = await prisma.p2PAccount.findMany({ where: { isActive: true } });
 
-    const promises = accounts.map(async (account) => {
+    const promises = accounts.map(async (account: any) => {
       const client = this.clients.get(account.id);
       if (!client) throw new Error(`Missing client for account ${account.id}`);
       return action(client, account);

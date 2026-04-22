@@ -64,7 +64,7 @@ router.get('/reports/export', async (req, res, next) => {
     // Return as JSON (frontend converts to CSV) or set CSV headers
     if (req.query['format'] === 'csv') {
       const headers = Object.keys(data[0] ?? {}).join(',');
-      const rows = data.map((row) => Object.values(row).join(','));
+      const rows = data.map((row: Record<string, unknown>) => Object.values(row).join(','));
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=audit-export-${new Date().toISOString().slice(0, 10)}.csv`);
       res.send([headers, ...rows].join('\n'));

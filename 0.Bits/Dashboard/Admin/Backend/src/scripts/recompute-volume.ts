@@ -51,8 +51,8 @@ async function recompute() {
           await prisma.user.update({
              where: { id: fakeUser.id },
              data: {
-                totalVolume: o.status === 'COMPLETED' ? o.amount : 0,
-                totalTrades: o.status === 'COMPLETED' ? 1 : 0
+                totalVolume: o!.status === 'COMPLETED' ? o!.amount : 0,
+                totalTrades: o!.status === 'COMPLETED' ? 1 : 0
              }
           });
        }
@@ -87,7 +87,7 @@ async function recompute() {
         log.info(`Merging ${duplicates.length} accounts mathematically resolving under true identity: ${realName}`);
         
         // Pick absolute oldest identity organically as Master identity safely
-        const master = duplicates.sort((a,b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+        const master: any = duplicates.sort((a,b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
         const slaves = duplicates.filter(d => d.id !== master.id);
 
         let mergedVolume = Number(master.totalVolume);
@@ -99,8 +99,8 @@ async function recompute() {
                   where: { id: o.id },
                   data: { userId: master.id }
                });
-               if (o.status === 'COMPLETED') {
-                  mergedVolume += Number(o.amount);
+               if (o!.status === 'COMPLETED') {
+                  mergedVolume += Number(o!.amount);
                   mergedTrades += 1;
                }
            }

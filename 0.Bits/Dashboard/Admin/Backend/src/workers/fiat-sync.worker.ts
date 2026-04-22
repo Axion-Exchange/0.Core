@@ -45,7 +45,7 @@ class FiatSyncWorker {
              balance: bal.balance,
              lastSyncAt: new Date()
           }
-        }).catch(async (e) => {
+        }).catch(async (e: any) => {
           const existing = await prisma.fiatLedger.findFirst({
             where: { source: bal.provider, currency: bal.currency }
           });

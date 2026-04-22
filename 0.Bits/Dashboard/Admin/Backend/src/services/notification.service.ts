@@ -46,7 +46,7 @@ export class NotificationService {
     const admins = await prisma.admin.findMany({ where: { isActive: true }, select: { id: true } });
 
     return prisma.notification.createMany({
-      data: admins.map((admin) => ({
+      data: admins.map((admin: any) => ({
         adminId: admin.id,
         type: data.type as any,
         title: data.title,
