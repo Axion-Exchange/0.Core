@@ -87,6 +87,7 @@ export class DashboardService {
         category: order.type === 'SELL' ? 'Sell' : 'Buy',
         // Permanently bind the authentic True Legal Name scraped intimately from the undocumented SAPI layer
         merchant: order.counterpartyName ? order.counterpartyName : (meta.counterparty_name ? String(meta.counterparty_name) : (order.counterparty || 'Binance P2P User')),
+        merchantId: order.userId || null,
         country: 'Global',
         currency: order.fiat || 'USD',
         lastEdited: order.updatedAt ? order.updatedAt.toISOString() : order.createdAt.toISOString(),
