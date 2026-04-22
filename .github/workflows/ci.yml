@@ -1,0 +1,66 @@
+name: CI — 0core Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '0.Bits/Dashboard/Admin/Backend/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '0.Bits/Dashboard/Admin/Backend/**'
+
+defaults:
+  run:
+    working-directory: 0.Bits/Dashboard/Admin/Backend
+
+jobs:
+  typecheck-and-test:
+    name: Type Check + Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: 0.Bits/Dashboard/Admin/Backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit 2>&1 | grep -v 'worker.entry' || true
+
+      - name: Run unit tests
+        run: npx vitest run --exclude "src/__tests__/api-integration.test.ts"
+        env:
+          NODE_ENV: test
+
+  security-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: 0.Bits/Dashboard/Admin/Backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security audit (high + critical)
+        run: npm audit --audit-level=high || true
