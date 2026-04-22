@@ -128,11 +128,12 @@ export class CurrencyLedgerService {
       seenBefore.add(name);
     }
 
-    // 2. Get all orders in range for this fiat
+    // 2. Get COMPLETED orders only in range for this fiat
     const orders = await prisma.p2POrder.findMany({
       where: {
         fiat,
         createdAt: { gte: dateFrom, lte: dateTo },
+        status: 'COMPLETED',
       },
       select: {
         createdAt: true,
@@ -166,10 +167,7 @@ export class CurrencyLedgerService {
 
       const day = dayMap.get(dayKey)!;
       day.orderCount++;
-
-      if (order.status === 'COMPLETED') {
-        day.completedVolume += Number(order.fiatAmount);
-      }
+      day.completedVolume += Number(order.fiatAmount);
 
       // A counterparty is "new" if we've NEVER seen them before
       const name = order.counterpartyName || order.counterparty || 'Unknown';
@@ -186,8 +184,8 @@ export class CurrencyLedgerService {
       "Rows read": day.newCounterparties * 100,
       "Queries": day.orderCount,
       "Payments completed": day.completedVolume,
-      "New counterparties": day.newCounterparties,
-      "Active orders": day.orderCount,
+      "New users": day.newCounterparties,
+      "Completed transactions": day.orderCount,
       "Order volume": day.completedVolume,
       "Logins": day.orderCount,
       "Sign ups": day.newCounterparties,
