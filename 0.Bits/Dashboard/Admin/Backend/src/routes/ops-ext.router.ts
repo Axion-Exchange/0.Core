@@ -92,3 +92,44 @@ opsExtRouter.get("/pnl/live", async (_req: Request, res: Response) => {
     res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
+
+// ── FIFO V2 Multi-Currency P&L ──────────────────────────────────────────────
+
+import { fifoV2 } from "../services/intelligence/fifo-v2.service.js";
+
+/** GET /operations/pnl/v2 — All currencies, all time */
+opsExtRouter.get("/pnl/v2", async (req: Request, res: Response) => {
+  try {
+    const period = (req.query.period as string) || "month";
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    let fromDate: Date | undefined;
+    let toDate: Date | undefined;
+    
+    switch (period) {
+      case "today": fromDate = todayStart; break;
+      case "yesterday": fromDate = new Date(todayStart.getTime() - 86400000); toDate = todayStart; break;
+      case "week": fromDate = new Date(todayStart.getTime() - 7 * 86400000); break;
+      case "month": fromDate = new Date(now.getFullYear(), now.getMonth(), 1); break;
+      case "all": break;
+    }
+    
+    const result = await fifoV2.computeAll(fromDate, toDate);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: (err as Error).message });
+  }
+});
+
+/** GET /operations/pnl/v2/:currency — Single currency P&L */
+opsExtRouter.get("/pnl/v2/:currency", async (req: Request, res: Response) => {
+  try {
+    const currency = (req.params.currency as string).toUpperCase();
+    const period = (req.query.period as string) || "month";
+    const result = await fifoV2.getSummary(currency, period as any);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: (err as Error).message });
+  }
+});
