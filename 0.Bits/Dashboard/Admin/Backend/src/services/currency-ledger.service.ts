@@ -152,14 +152,15 @@ export class CurrencyLedgerService {
     // Convert to OverviewData format
     const overviews = Array.from(dayMap.values()).map(day => ({
       date: day.date,
-      "Rows written": day.orderCount,          // Used internally by ChartCard
-      "Rows read": day.counterparties.size * 100, // Scale for visual
+      "Rows written": day.orderCount,
+      "Rows read": day.counterparties.size * 100,
       "Queries": day.orderCount,
       "Payments completed": day.completedVolume,
       "New counterparties": day.counterparties.size,
       "Active orders": day.orderCount,
-      "Logins": day.orderCount,                 // Fallback for existing template
-      "Sign ups": day.counterparties.size,       // Fallback for existing template
+      "Order volume": day.completedVolume,
+      "Logins": day.orderCount,
+      "Sign ups": day.counterparties.size,
       "Sign outs": 0,
       "Support calls": 0,
     }));
