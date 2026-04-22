@@ -70,7 +70,7 @@ export async function withAdvisoryLock<T>(
 ): Promise<T> {
   const lockId = hashToInt32(resourceId);
 
-  return prisma.$transaction(async (tx: any) => {
+  return prisma.$transaction(async (tx) => {
     // Acquire the advisory lock — blocks until available
     await tx.$queryRawUnsafe(
       `SELECT pg_advisory_xact_lock($1, $2)`,
@@ -104,7 +104,7 @@ export async function tryAdvisoryLock<T>(
 ): Promise<{ acquired: boolean; result?: T }> {
   const lockId = hashToInt32(resourceId);
 
-  return prisma.$transaction(async (tx: any) => {
+  return prisma.$transaction(async (tx) => {
     const [row]: any[] = await tx.$queryRawUnsafe(
       `SELECT pg_try_advisory_xact_lock($1, $2) AS acquired`,
       namespace,

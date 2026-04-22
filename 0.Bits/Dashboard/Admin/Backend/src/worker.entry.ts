@@ -14,7 +14,6 @@
 
 import 'dotenv/config';
 import { createLogger } from './lib/logger.js';
-import { runAllHealthChecks } from './services/health-checker.service.js';
 import { createWorker, registerRepeatableJobs, shutdownQueues, QUEUE_NAMES } from './lib/queue.js';
 import { disconnectRedis } from './lib/redis.js';
 import { disconnectDatabase } from './lib/db.js';
@@ -81,18 +80,6 @@ async function boot() {
 boot().catch((err) => {
   log.error(`Worker boot failed: ${err.message}`);
   process.exit(1);
-});
-
-// ── Health Check Worker ────────────────────────────────
-createWorker(QUEUE_NAMES.HEALTH_CHECK, async () => {
-  log.info("[HealthCheck] Running infrastructure probes...");
-  const results = await runAllHealthChecks();
-  const failures = results.filter(r => r.status !== "healthy");
-  if (failures.length > 0) {
-    log.warn("[HealthCheck] " + failures.length + " service(s) degraded/down: " + failures.map(f => f.service).join(", "));
-  } else {
-    log.info("[HealthCheck] All " + results.length + " services healthy");
-  }
 });
 
 // ── Graceful Shutdown ────────────────────────────────────────────────────────

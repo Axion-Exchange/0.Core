@@ -33,7 +33,6 @@ export const QUEUE_NAMES = {
   FIAT_SYNC: 'fiat-sync',
   PEAR_DB_SYNC: 'pear-db-sync',
   KYC_SYNC: 'kyc-sync',
-  HEALTH_CHECK: 'health-check',
 } as const;
 
 type QueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];
@@ -125,7 +124,6 @@ export async function registerRepeatableJobs(): Promise<void> {
     { queue: QUEUE_NAMES.FIAT_SYNC,        every: 30000,  name: 'fiat-sync-tick' },
     { queue: QUEUE_NAMES.PEAR_DB_SYNC,     every: 30000,  name: 'pear-db-sync-tick' },
     { queue: QUEUE_NAMES.KYC_SYNC,         every: 30000,  name: 'kyc-sync-tick' },
-    { queue: QUEUE_NAMES.HEALTH_CHECK,     every: 300000, name: 'health-check-tick' },
   ];
 
   for (const { queue, every, name } of schedules) {
