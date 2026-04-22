@@ -11,8 +11,8 @@ class FiatSyncWorker {
 
   public start(intervalMs: number = 30000) {
     log.info(`Booting Institutional Bank Sync Worker [rate: ${intervalMs}ms]...`);
-    this.processTick(); // Initial run
-    this.intervalId = setInterval(() => this.processTick(), intervalMs);
+    this.run(); // Initial run
+    this.intervalId = setInterval(() => this.run(), intervalMs);
   }
 
   public stop() {
@@ -20,7 +20,7 @@ class FiatSyncWorker {
     log.info('Institutional Bank Sync Worker halted.');
   }
 
-  private async processTick() {
+  async run() {
     if (this.isRunning) return;
     this.isRunning = true;
 

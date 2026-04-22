@@ -28,6 +28,7 @@
     "@prisma/client": "^6.4.1",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^12.9.0",
+    "bullmq": "^5.75.2",
     "ccxt": "^4.5.49",
     "cors": "^2.8.6",
     "csv-parse": "^6.2.1",

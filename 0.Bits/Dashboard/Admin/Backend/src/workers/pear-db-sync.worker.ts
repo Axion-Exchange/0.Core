@@ -20,9 +20,9 @@ export class PearDbSyncWorker {
   public start(intervalMs = 30000) {
     if (this.intervalId) return;
     log.info(`Booting PearV2 DB Sync DAEMON [rate: ${intervalMs}ms] bridging SQLite to Postgres...`);
-    this.intervalId = setInterval(() => this.tick(), intervalMs);
+    this.intervalId = setInterval(() => this.run(), intervalMs);
     // Execute immediately
-    this.tick();
+    this.run();
   }
 
   public stop() {
@@ -33,7 +33,7 @@ export class PearDbSyncWorker {
     }
   }
 
-  private async tick() {
+  async run() {
     if (this.isRunning) return;
     this.isRunning = true;
 

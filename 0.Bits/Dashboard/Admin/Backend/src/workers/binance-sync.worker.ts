@@ -11,8 +11,8 @@ class BinanceSyncWorker {
 
   public start(intervalMs: number = 30000) {
     log.info(`Booting Binance DB Sync Worker [rate: ${intervalMs}ms]...`);
-    this.processTick(); // Initial trigger
-    this.intervalId = setInterval(() => this.processTick(), intervalMs);
+    this.run(); // Initial trigger
+    this.intervalId = setInterval(() => this.run(), intervalMs);
   }
 
   public stop() {
@@ -20,7 +20,7 @@ class BinanceSyncWorker {
     log.info('Binance DB Sync Worker halted.');
   }
 
-  private async processTick() {
+  async run() {
     if (this.isRunning) return;
     this.isRunning = true;
 

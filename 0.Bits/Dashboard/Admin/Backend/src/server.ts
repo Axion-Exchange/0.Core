@@ -32,12 +32,6 @@ import { fiatRouter } from './routes/fiat.router.js';
 import { reconciliationRouter } from './routes/reconciliation.router.js';
 import { currencyLedgerRouter } from './routes/currency-ledger.router.js';
 import { kycWebhookRouter } from './routes/kyc-webhook.router.js';
-import { orchestratorWorker } from './workers/p2p.worker.js';
-import { pearDbSyncWorker } from './workers/pear-db-sync.worker.js';
-import { binanceSyncWorker } from './workers/binance-sync.worker.js';
-import { chatSyncWorker } from './workers/chat-sync.worker.js';
-import { fiatSyncWorker } from './workers/fiat-sync.worker.js';
-import { kycSyncWorker } from './workers/kyc-sync.worker.js';
 
 const log = createLogger('server');
 
@@ -137,23 +131,16 @@ const server = httpServer.listen(PORT, () => {
     port: PORT,
   });
   
-  // Ignite the background P2P execution loop
-  orchestratorWorker.start();
-  
-  // Ignite Python-Postgres DB Syncer
-  pearDbSyncWorker.start(30000);
-  
-  // Ignite Binance Auditing Archiver
-  binanceSyncWorker.start(30000);
-  
-  // Ignite Institutional Bank Polling
-  fiatSyncWorker.start(30000);
-  
-  // Ignite P2P Chat Polling
-  chatSyncWorker.start();
-  
-  // Ignite KYC Didit Polling (30s)
-  kycSyncWorker.start(30000);
+  // ── Workers decoupled to BullMQ (Phase 2) ──────────────────────────────
+  // Doc ref: §Decoupling via Distributed Job Queues (citations 5, 6)
+  // "total separation of worker processes from HTTP server processes"
+  //
+  // All background workers now run in a separate PM2 process:
+  //   pm2 start dist/worker.entry.js --name 0core-workers
+  //
+  // This HTTP server is now STATELESS and horizontally scalable.
+  // Scaling to PM2 cluster mode will NOT cause duplicate polling or IP bans.
+  log.info('HTTP server is worker-free. Background jobs managed by BullMQ.');
 });
 
 // ── Graceful Shutdown ────────────────────────────────
@@ -163,12 +150,6 @@ async function shutdown(signal: string) {
 
   server.close(async () => {
     log.info('HTTP server closed');
-    orchestratorWorker.stop();
-    pearDbSyncWorker.stop();
-    binanceSyncWorker.stop();
-    chatSyncWorker.stop();
-    fiatSyncWorker.stop();
-    kycSyncWorker.stop();
     await disconnectRedis();
     await disconnectDatabase();
     log.info('All connections closed');

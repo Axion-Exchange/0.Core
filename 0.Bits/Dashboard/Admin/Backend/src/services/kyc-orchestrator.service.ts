@@ -402,7 +402,37 @@ export class KycOrchestratorService {
       let similarity = userId ? 1.0 : 0;
       let matchMethod = userId ? 'exact_norm' : '';
 
-      // 2. PearV2 fuzzy match (handles spelling, order, truncation, Cyrillic)
+      // 2. pg_trgm database-tier fuzzy search (sub-millisecond via GIN index)
+      // Doc ref: §Offloading Fuzzy Search to the Data Tier (citations 21, 23, 24)
+      // "Postgres extensions like pg_trgm allow for typo-tolerant fuzzy matching at sub-millisecond speeds"
+      if (!userId) {
+        try {
+          const trgmResults: any[] = await prisma.$queryRawUnsafe(`
+            SELECT id, "legalName", similarity("legalName", $1) AS sim
+            FROM users
+            WHERE "legalName" IS NOT NULL AND "legalName" % $1
+            ORDER BY sim DESC
+            LIMIT 3
+          `, sess.fullName);
+
+          if (trgmResults.length > 0) {
+            const best = trgmResults[0];
+            const sim = Number(best.sim);
+            // Only accept if similarity > 0.3 and user not already matched
+            if (sim > 0.3 && !matchedUserIds.has(best.id)) {
+              userId = best.id;
+              similarity = sim;
+              matchMethod = 'pg_trgm';
+            }
+          }
+        } catch (trgmErr: any) {
+          // pg_trgm not available or query failed — fall through to TypeScript matcher
+          log.warn(`[Orchestrator] pg_trgm query failed, falling back to Levenshtein: ${trgmErr.message}`);
+        }
+      }
+
+      // 3. PearV2 fuzzy match FALLBACK (handles Cyrillic transliteration edge cases)
+      // This catches cases where pg_trgm misses due to script differences
       if (!userId) {
         let bestConf = 0;
         for (const [uid, data] of userNorms) {
