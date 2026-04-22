@@ -23,6 +23,9 @@ import { p2pRouter } from './routes/p2p.router.js';
 import { treasuryRouter } from './routes/treasury.router.js';
 import { usersRouter } from './routes/users.router.js';
 import { operationsRouter } from './routes/operations.router.js';
+import { opsExtRouter } from './routes/ops-ext.router.js';
+import { featureFlags } from './services/feature-flags.service.js';
+import { startPnLEmitter } from './services/pnl-realtime.service.js';
 import { complianceRouter } from './routes/compliance.router.js';
 import { notificationsRouter } from './routes/notifications.router.js';
 import { teamRouter } from './routes/team.router.js';
@@ -110,6 +113,7 @@ app.use('/api/v1/treasury', authLimiter, treasuryRouter);
 app.use('/api/v1/treasury/currency', authLimiter, currencyLedgerRouter);
 app.use('/api/v1/users', authLimiter, usersRouter);
 app.use('/api/v1/operations', authLimiter, operationsRouter);
+app.use('/api/v1/operations', authLimiter, opsExtRouter);
 app.use('/api/v1/compliance', authLimiter, complianceRouter);
 app.use('/api/v1/notifications', authLimiter, notificationsRouter);
 app.use('/api/v1/team', authLimiter, teamRouter);
@@ -137,6 +141,12 @@ const PORT = config.PORT;
 
 const httpServer = createServer(app);
 initSocket(httpServer);
+
+// Initialize feature flags in Redis
+featureFlags.initialize().catch((err) => log.error("Feature flags init failed:", err));
+
+// Start real-time PnL WebSocket emitter
+startPnLEmitter();
 
 const server = httpServer.listen(PORT, () => {
   log.info(`0.Bits API server running on port ${PORT}`, {

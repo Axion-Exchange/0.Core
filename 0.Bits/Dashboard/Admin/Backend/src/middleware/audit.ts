@@ -1,3 +1,4 @@
+import { sinkAuditToBigQuery } from "../services/audit-bigquery.service.js";
 import type { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/db.js';
 import { createLogger } from '../lib/logger.js';
@@ -31,6 +32,7 @@ export function auditLog(req: Request, res: Response, next: NextFunction): void 
       const action = deriveAction(method, req.path);
       const resource = deriveResource(req.path);
 
+      // Write to PostgreSQL (local DB)
       prisma.auditLog.create({
         data: {
           adminId: req.admin.sub,
@@ -48,6 +50,23 @@ export function auditLog(req: Request, res: Response, next: NextFunction): void 
         },
       }).catch((err: unknown) => {
         log.error('Failed to write audit log', { error: (err as Error).message });
+      });
+
+      // Immutable audit log → BigQuery (tamper-proof, append-only)
+      sinkAuditToBigQuery({
+        id: crypto.randomUUID(),
+        adminId: req.admin.sub,
+        action,
+        resource,
+        resourceId: extractResourceId(req.params as Record<string, string>),
+        method,
+        path: req.path,
+        ipAddress: (req.ip ?? req.socket.remoteAddress ?? 'unknown'),
+        userAgent: req.headers['user-agent'] ?? undefined,
+        requestBody: sanitizeBody(req.body) ?? undefined,
+        responseCode: res.statusCode,
+        duration,
+        correlationId: req.correlationId ?? undefined,
       });
     }
 
