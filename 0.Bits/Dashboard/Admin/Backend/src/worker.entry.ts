@@ -67,6 +67,31 @@ createWorker(QUEUE_NAMES.KYC_SYNC, async (job) => {
   await kycSyncWorker.run();
 });
 
+// ── Health Check Worker ────────────────────────────────
+import { runAllHealthChecks } from "./services/health-checker.service.js";
+createWorker(QUEUE_NAMES.HEALTH_CHECK, async () => {
+  log.info("[HealthCheck] Running infrastructure probes...");
+  const results = await runAllHealthChecks();
+  const failures = results.filter((r: any) => r.status !== "healthy");
+  if (failures.length > 0) {
+    log.warn("[HealthCheck] " + failures.length + " service(s) degraded: " + failures.map((f: any) => f.service).join(", "));
+  } else {
+    log.info("[HealthCheck] All " + results.length + " services healthy");
+  }
+});
+
+// ── BigQuery Sync Worker ─────────────────────────────────
+createWorker(QUEUE_NAMES.BIGQUERY_SYNC, async () => {
+  const { syncToBigQuery } = await import("./services/bigquery-sync.service.js");
+  await syncToBigQuery();
+});
+
+// ── Fraud Scan Worker (READ-ONLY, notification only) ────
+createWorker(QUEUE_NAMES.FRAUD_SCAN, async () => {
+  const { runFraudScan } = await import("./services/fraud-notifier.service.js");
+  await runFraudScan();
+});
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {
