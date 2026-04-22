@@ -45,6 +45,10 @@ const envSchema = z.object({
 
   // Logging
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  // Didit KYC
+  DIDIT_APP_ID: z.string().optional(),
+  DIDIT_API_KEY: z.string().optional(),
 });
 
 function loadConfig() {
