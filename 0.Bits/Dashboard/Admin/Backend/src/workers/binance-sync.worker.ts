@@ -19,6 +19,10 @@ class BinanceSyncWorker {
     if (this.intervalId) clearInterval(this.intervalId);
     log.info('Binance DB Sync Worker halted.');
   }
+  /** Single-shot execution for BullMQ job processor */
+  public async run() {
+    return this.processTick();
+  }
 
   private async processTick() {
     if (this.isRunning) return;

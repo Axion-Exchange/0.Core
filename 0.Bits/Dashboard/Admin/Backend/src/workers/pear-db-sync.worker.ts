@@ -33,6 +33,11 @@ export class PearDbSyncWorker {
     }
   }
 
+  /** Single-shot execution for BullMQ job processor */
+  public async run() {
+    return this.tick();
+  }
+
   private async tick() {
     if (this.isRunning) return;
     this.isRunning = true;

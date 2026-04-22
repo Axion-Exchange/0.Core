@@ -20,6 +20,11 @@ class FiatSyncWorker {
     log.info('Institutional Bank Sync Worker halted.');
   }
 
+  /** Single-shot execution for BullMQ job processor */
+  public async run() {
+    return this.processTick();
+  }
+
   private async processTick() {
     if (this.isRunning) return;
     this.isRunning = true;
