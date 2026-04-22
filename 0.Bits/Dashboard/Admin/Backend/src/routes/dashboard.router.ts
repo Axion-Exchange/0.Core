@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { dashboardService } from '../services/dashboard.service.js';
-import { optionalAuth } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 import { sendSuccess } from '../lib/response.js';
 
 const router = Router();
-router.use(optionalAuth);
+router.use(requireAuth);
 
 // GET /summary — Aggregated home dashboard metrics
 router.get('/summary', async (_req, res, next) => {

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { treasuryService } from '../services/treasury.service.js';
-import { optionalAuth } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 import { validateQuery, validateParams } from '../middleware/validate.js';
 import { idParamSchema, param } from '../validators/common.schema.js';
 import { transactionQuerySchema, balanceHistorySchema } from '../validators/treasury.schema.js';
@@ -8,7 +8,7 @@ import { sendSuccess, sendPaginated } from '../lib/response.js';
 import { buildPaginationMeta } from '../lib/pagination.js';
 
 const router = Router();
-router.use(optionalAuth);
+router.use(requireAuth);
 
 // GET /portfolio — Aggregated NAV across all currencies
 router.get('/portfolio', async (_req, res, next) => {

@@ -1,4 +1,6 @@
 import { prisma } from '../lib/db.js';
+import { safeTransaction } from '../lib/transaction.js';
+import { withAdvisoryLock, LOCK_NS } from '../lib/advisory-lock.js';
 import type { Prisma, TransactionStatus, TransactionType } from '@prisma/client';
 
 export class TreasuryService {
@@ -119,23 +121,27 @@ export class TreasuryService {
    * Update portfolio balance (called by sync jobs).
    */
   async upsertPortfolio(currency: string, data: { totalBalance: number; availableBalance: number; lockedBalance?: number; pendingBalance?: number }) {
-    return prisma.portfolio.upsert({
-      where: { currency },
-      create: {
-        currency,
-        totalBalance: data.totalBalance,
-        availableBalance: data.availableBalance,
-        lockedBalance: data.lockedBalance ?? 0,
-        pendingBalance: data.pendingBalance ?? 0,
-        lastSyncAt: new Date(),
-      },
-      update: {
-        totalBalance: data.totalBalance,
-        availableBalance: data.availableBalance,
-        lockedBalance: data.lockedBalance ?? 0,
-        pendingBalance: data.pendingBalance ?? 0,
-        lastSyncAt: new Date(),
-      },
+    // Doc ref: §Ledger Integrity (citations 9, 28, 29)
+    // Advisory lock prevents concurrent portfolio mutations for the same currency.
+    return withAdvisoryLock(LOCK_NS.USER_BALANCE, `portfolio:${currency}`, async (tx) => {
+      return tx.portfolio.upsert({
+        where: { currency },
+        create: {
+          currency,
+          totalBalance: data.totalBalance,
+          availableBalance: data.availableBalance,
+          lockedBalance: data.lockedBalance ?? 0,
+          pendingBalance: data.pendingBalance ?? 0,
+          lastSyncAt: new Date(),
+        },
+        update: {
+          totalBalance: data.totalBalance,
+          availableBalance: data.availableBalance,
+          lockedBalance: data.lockedBalance ?? 0,
+          pendingBalance: data.pendingBalance ?? 0,
+          lastSyncAt: new Date(),
+        },
+      });
     });
   }
 
