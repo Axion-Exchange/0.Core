@@ -100,15 +100,35 @@ export class CurrencyLedgerService {
    * Returns data in the OverviewData shape the ChartCard components expect.
    * 
    * Metrics per day:
-   *   - "New counterparties" → distinct counterpartyNames that day
-   *   - "Payments completed" → sum of completed fiatAmount that day  
+   *   - "New counterparties" → counterparties trading for the FIRST TIME ever on that day
+   *   - "Order volume" → sum of completed fiatAmount that day  
    *   - "Active orders" → count of orders created that day
    */
   async getDailyMetrics(fiat: string, from?: Date, to?: Date) {
     const dateFrom = from || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
     const dateTo = to || new Date();
 
-    // Get all orders in range for this fiat
+    // 1. Get ALL counterparties who traded BEFORE the date range
+    //    so we can identify truly "new" ones within the range
+    const historicalCounterparties = await prisma.p2POrder.findMany({
+      where: {
+        fiat,
+        createdAt: { lt: dateFrom },
+      },
+      select: {
+        counterpartyName: true,
+        counterparty: true,
+      },
+      distinct: ['counterpartyName', 'counterparty'],
+    });
+
+    const seenBefore = new Set<string>();
+    for (const cp of historicalCounterparties) {
+      const name = cp.counterpartyName || cp.counterparty || 'Unknown';
+      seenBefore.add(name);
+    }
+
+    // 2. Get all orders in range for this fiat
     const orders = await prisma.p2POrder.findMany({
       where: {
         fiat,
@@ -124,12 +144,12 @@ export class CurrencyLedgerService {
       orderBy: { createdAt: 'asc' },
     });
 
-    // Group by day
+    // 3. Group by day, tracking truly NEW counterparties
     const dayMap = new Map<string, {
       date: string;
       completedVolume: number;
       orderCount: number;
-      counterparties: Set<string>;
+      newCounterparties: number;
     }>();
 
     for (const order of orders) {
@@ -140,7 +160,7 @@ export class CurrencyLedgerService {
           date: dayKey,
           completedVolume: 0,
           orderCount: 0,
-          counterparties: new Set(),
+          newCounterparties: 0,
         });
       }
 
@@ -151,22 +171,26 @@ export class CurrencyLedgerService {
         day.completedVolume += Number(order.fiatAmount);
       }
 
+      // A counterparty is "new" if we've NEVER seen them before
       const name = order.counterpartyName || order.counterparty || 'Unknown';
-      day.counterparties.add(name);
+      if (!seenBefore.has(name)) {
+        seenBefore.add(name); // Mark as seen so they're not counted again tomorrow
+        day.newCounterparties++;
+      }
     }
 
-    // Convert to OverviewData format
+    // 4. Convert to OverviewData format
     const overviews = Array.from(dayMap.values()).map(day => ({
       date: day.date,
       "Rows written": day.orderCount,
-      "Rows read": day.counterparties.size * 100,
+      "Rows read": day.newCounterparties * 100,
       "Queries": day.orderCount,
       "Payments completed": day.completedVolume,
-      "New counterparties": day.counterparties.size,
+      "New counterparties": day.newCounterparties,
       "Active orders": day.orderCount,
       "Order volume": day.completedVolume,
       "Logins": day.orderCount,
-      "Sign ups": day.counterparties.size,
+      "Sign ups": day.newCounterparties,
       "Sign outs": 0,
       "Support calls": 0,
     }));
