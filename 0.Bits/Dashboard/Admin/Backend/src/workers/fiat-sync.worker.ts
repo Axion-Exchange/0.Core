@@ -25,14 +25,13 @@ class FiatSyncWorker {
     this.isRunning = true;
 
     try {
-      // 1. Fetch live balances
+      // 1. Fetch live balances from all rails
       const balances = await fiatService.getAllBalances();
       
       for (const bal of balances) {
-        // Upsert fiat ledger safely
+        // Upsert fiat ledger safely (existing behavior — backward compat)
         await prisma.fiatLedger.upsert({
           where: { 
-            // Workaround for composite keys if they do not exist
             id: bal.accountId 
           },
           create: {
@@ -47,7 +46,6 @@ class FiatSyncWorker {
              lastSyncAt: new Date()
           }
         }).catch(async (e) => {
-          // If ID constraint fails, findFirst and update logic
           const existing = await prisma.fiatLedger.findFirst({
             where: { source: bal.provider, currency: bal.currency }
           });
@@ -62,6 +60,32 @@ class FiatSyncWorker {
              });
           }
         });
+
+        // ──────────────────────────────────────────────────────
+        // NEW: Append-only balance snapshot into balance_ledger
+        // Each tick creates a NEW ROW — never updates/deletes.
+        // ──────────────────────────────────────────────────────
+        
+        // Calculate pending (escrowed P2P orders) for this currency
+        const escrowAgg = await prisma.p2POrder.aggregate({
+          where: {
+            fiat: bal.currency,
+            status: { in: ['PENDING_FIAT', 'FIAT_RECEIVED', 'PENDING_RELEASE', 'APPEALING'] },
+          },
+          _sum: { fiatAmount: true },
+        });
+        const pendingAmount = Number(escrowAgg._sum.fiatAmount || 0);
+
+        await prisma.balanceLedger.create({
+          data: {
+            source: bal.provider,
+            currency: bal.currency,
+            available: bal.balance,
+            pending: pendingAmount,
+            metadata: { rawBalance: bal.balance, provider: bal.provider },
+            snapshotAt: new Date(),
+          }
+        });
       }
 
       // 2. Fetch live transactions to preserve maximum information 
@@ -69,7 +93,6 @@ class FiatSyncWorker {
       let importedCount = 0;
 
       for (const tx of rawTransactions) {
-         // Prevent redundant imports
          const existing = await prisma.transaction.findUnique({
             where: { externalId: tx.externalId }
          });
@@ -84,7 +107,7 @@ class FiatSyncWorker {
                   status: TransactionStatus.COMPLETED,
                   source: tx.provider,
                   description: tx.description,
-                  metadata: tx.rawPayload, // Maximum information logged
+                  metadata: tx.rawPayload,
                   completedAt: tx.timestamp,
                   createdAt: tx.timestamp
                }

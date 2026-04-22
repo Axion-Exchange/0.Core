@@ -541,6 +541,22 @@ model BalanceSnapshot {
   @@map("balance_snapshots")
 }
 
+/// Append-only institutional balance ledger. Every 30s a new row is inserted.
+/// NEVER updated or deleted — provides full historical audit trail.
+/// Query: "What was our Januar balance at 1:25 PM on Jan 15?"
+model BalanceLedger {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source     String   // "januar", "facilitapay", "binance_escrow"
+  currency   String   @db.VarChar(10) // EUR, COP, MXN
+  available  Decimal  @db.Decimal(24, 8) // Live bank balance at snapshot time
+  pending    Decimal  @default(0) @db.Decimal(24, 8) // Escrowed P2P amount at snapshot time
+  metadata   Json?    // Raw API response for audit
+  snapshotAt DateTime @default(now()) // When this snapshot was taken
+
+  @@index([source, currency, snapshotAt])
+  @@map("balance_ledger")
+}
+
 /// Unified transaction ledger (buy/sell/transfer/conversion).
 model Transaction {
   id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

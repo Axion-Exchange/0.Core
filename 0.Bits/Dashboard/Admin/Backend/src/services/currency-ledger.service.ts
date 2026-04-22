@@ -31,40 +31,51 @@ const FIAT_SYMBOLS: Record<string, string> = {
 export class CurrencyLedgerService {
 
   /**
-   * Balance summary for the top card (Balance / Available / Locked / Pending)
+   * Balance summary for the top card.
+   * Available = Live bank balance (from latest BalanceLedger snapshot)
+   * Pending   = Active P2P escrow orders (from latest BalanceLedger snapshot)
    */
   async getBalanceSummary(fiat: string) {
     const source = FIAT_SOURCE_MAP[fiat] || 'unknown';
     const symbol = FIAT_SYMBOLS[fiat] || '$';
 
-    // 1. Live bank balance from fiat_ledgers
-    const ledger = await prisma.fiatLedger.findFirst({
-      where: { currency: fiat, source },
+    // 1. Get latest snapshot from append-only balance_ledger
+    const latestSnapshot = await prisma.balanceLedger.findFirst({
+      where: { source, currency: fiat },
+      orderBy: { snapshotAt: 'desc' },
     });
-    const bankBalance = ledger ? Number(ledger.balance) : 0;
 
-    // 2. Locked in active P2P orders (PENDING_FIAT, FIAT_RECEIVED, PENDING_RELEASE)
-    const lockedOrders = await prisma.p2POrder.aggregate({
-      where: {
-        fiat,
-        status: { in: ['PENDING_FIAT', 'FIAT_RECEIVED', 'PENDING_RELEASE'] },
-      },
-      _sum: { fiatAmount: true },
-      _count: true,
-    });
-    const lockedAmount = Number(lockedOrders._sum.fiatAmount || 0);
+    const available = latestSnapshot ? Number(latestSnapshot.available) : 0;
+    const pending = latestSnapshot ? Number(latestSnapshot.pending) : 0;
 
-    // 3. Pending (APPEALING, DISPUTE_RESOLVED — not yet settled)
-    const pendingOrders = await prisma.p2POrder.aggregate({
-      where: {
-        fiat,
-        status: { in: ['APPEALING', 'DISPUTE_RESOLVED'] },
-      },
-      _sum: { fiatAmount: true },
-    });
-    const pendingAmount = Number(pendingOrders._sum.fiatAmount || 0);
+    // 2. Fallback: if no snapshot yet, read from legacy fiat_ledgers
+    let bankBalance = available;
+    if (!latestSnapshot) {
+      const ledger = await prisma.fiatLedger.findFirst({
+        where: { currency: fiat, source },
+      });
+      bankBalance = ledger ? Number(ledger.balance) : 0;
 
-    // 4. Total completed volume (all-time)
+      // Calculate pending from live P2P orders
+      const escrowAgg = await prisma.p2POrder.aggregate({
+        where: {
+          fiat,
+          status: { in: ['PENDING_FIAT', 'FIAT_RECEIVED', 'PENDING_RELEASE', 'APPEALING'] },
+        },
+        _sum: { fiatAmount: true },
+      });
+      const escrowPending = Number(escrowAgg._sum.fiatAmount || 0);
+
+      return {
+        fiat, symbol,
+        available: bankBalance,
+        pending: escrowPending,
+        totalBalance: bankBalance + escrowPending,
+        lastSnapshotAt: null,
+      };
+    }
+
+    // 3. Total completed volume (all-time)
     const completedVolume = await prisma.p2POrder.aggregate({
       where: { fiat, status: 'COMPLETED' },
       _sum: { fiatAmount: true },
@@ -72,20 +83,15 @@ export class CurrencyLedgerService {
     });
     const totalVolume = Number(completedVolume._sum.fiatAmount || 0);
 
-    // Available = bank balance - locked
-    const available = Math.max(bankBalance - lockedAmount, 0);
-
     return {
       fiat,
       symbol,
-      totalBalance: bankBalance,
       available,
-      locked: lockedAmount,
-      pending: pendingAmount,
+      pending,
+      totalBalance: available + pending,
       totalCompletedVolume: totalVolume,
       totalCompletedOrders: completedVolume._count,
-      activeOrders: lockedOrders._count,
-      lastSyncAt: ledger?.lastSyncAt || null,
+      lastSnapshotAt: latestSnapshot.snapshotAt,
     };
   }
 
