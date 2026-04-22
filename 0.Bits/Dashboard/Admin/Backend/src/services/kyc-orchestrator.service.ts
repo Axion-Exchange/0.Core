@@ -465,13 +465,54 @@ export class KycOrchestratorService {
   }
 
   /**
-   * Run full pipeline: sync all providers → match all sessions → return unified results.
+   * Propagate Didit status changes to already-matched users.
+   * Catches: manual approvals, expirations, declines done on Didit console.
+   */
+  async propagateStatusChanges(): Promise<{ updated: number; changes: { user: string; from: string; to: string }[] }> {
+    const matched = await prisma.kycSession.findMany({
+      where: { matchedUserId: { not: null } },
+      include: { matchedUser: { select: { id: true, legalName: true, kycStatus: true } } },
+    });
+
+    let updated = 0;
+    const changes: { user: string; from: string; to: string }[] = [];
+
+    for (const sess of matched) {
+      if (!sess.matchedUser) continue;
+      const newStatus = this.mapStatus(sess.status);
+      const currentStatus = sess.matchedUser.kycStatus;
+
+      // Only propagate if status actually changed
+      if (newStatus !== currentStatus) {
+        await prisma.user.update({
+          where: { id: sess.matchedUser.id },
+          data: { kycStatus: newStatus },
+        });
+        updated++;
+        changes.push({
+          user: sess.matchedUser.legalName || sess.matchedUser.id,
+          from: currentStatus,
+          to: newStatus,
+        });
+        log.info(`[Orchestrator] Status change: ${sess.matchedUser.legalName} ${currentStatus} → ${newStatus}`);
+      }
+    }
+
+    if (updated > 0) {
+      log.info(`[Orchestrator] Propagated ${updated} status changes`);
+    }
+    return { updated, changes };
+  }
+
+  /**
+   * Run full pipeline: sync all providers → match all sessions → propagate status changes.
    */
   async runFullPipeline() {
     log.info('[Orchestrator] ═══ Starting Full KYC Pipeline ═══');
 
     const syncResult = await this.syncAllProviders();
     const matchResult = await this.matchAllSessions();
+    const statusResult = await this.propagateStatusChanges();
 
     // Count totals
     const totalSessions = await prisma.kycSession.count();
@@ -484,6 +525,7 @@ export class KycOrchestratorService {
     return {
       sync: syncResult,
       matching: matchResult,
+      statusPropagation: statusResult,
       totals: {
         sessions: totalSessions,
         matchedSessions: totalMatched,
