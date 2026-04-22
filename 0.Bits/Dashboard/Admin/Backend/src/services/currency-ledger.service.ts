@@ -173,9 +173,14 @@ export class CurrencyLedgerService {
   async getOrdersTable(fiat: string, limit: number = 50, page: number = 1) {
     const skip = (page - 1) * limit;
 
+    // Only show Pending (active open orders) and Completed — no cancelled/expired
+    const statusFilter = {
+      in: ['PENDING_FIAT', 'FIAT_RECEIVED', 'PENDING_RELEASE', 'RELEASED', 'COMPLETED', 'APPEALING', 'DISPUTE_RESOLVED'] as any[],
+    };
+
     const [orders, total] = await Promise.all([
       prisma.p2POrder.findMany({
-        where: { fiat },
+        where: { fiat, status: statusFilter },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip,
@@ -195,18 +200,15 @@ export class CurrencyLedgerService {
           completedAt: true,
         },
       }),
-      prisma.p2POrder.count({ where: { fiat } }),
+      prisma.p2POrder.count({ where: { fiat, status: statusFilter } }),
     ]);
 
     // Map to Usage[] format the DataTable expects
+    // Pending = open order on Binance (awaiting fiat/release)
+    // Completed = trade fully settled
     const usage = orders.map(order => {
-      // Map OrderStatus to the 3 statuses the template badge supports
-      let displayStatus = 'Completed';
-      if (order.status === 'CANCELLED' || order.status === 'EXPIRED') {
-        displayStatus = 'Cancelled';
-      } else if (order.status !== 'COMPLETED' && order.status !== 'RELEASED') {
-        displayStatus = 'Pending';
-      }
+      const isCompleted = order.status === 'COMPLETED' || order.status === 'RELEASED';
+      const displayStatus = isCompleted ? 'Completed' : 'Pending';
 
       return {
         transactionNumber: order.externalOrderId || order.id.slice(0, 13),
