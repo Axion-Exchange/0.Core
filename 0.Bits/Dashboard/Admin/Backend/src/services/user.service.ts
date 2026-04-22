@@ -1,3 +1,4 @@
+import { safeTransaction } from '../lib/transaction.js';
 import { prisma } from '../lib/db.js';
 import { NotFoundError } from '../middleware/error.js';
 import type { KYCStatus, Prisma } from '@prisma/client';
