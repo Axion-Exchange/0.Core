@@ -160,56 +160,96 @@ export class TreasuryService {
   }
 
   /**
-   * Institutional Aggregated Balances mapped to dynamic React Frontend Components.
+   * Institutional Aggregated Balances — Uses balance_ledger for correct
+   * available + pending totals, and real historical snapshots for charts.
    */
   async getAggregatedPortfolioView() {
-    // 1. Fetch live ledgers bridging bank APIs and exchange APIs
-    const fiatLedgers = await prisma.fiatLedger.findMany();
-    
-    // We will bucket them by source natively.
-    const summaryBuckets = [];
-    
-    for (const ledg of fiatLedgers) {
-      const isPositive = Math.random() > 0.5; // Simulate performance calculation
-      summaryBuckets.push({
-        name: `${ledg.source?.toUpperCase() || 'EXTERNAL'} - ${ledg.currency}`,
-        value: `$${Number(ledg.balance).toLocaleString()}`,
-        invested: `$${(Number(ledg.balance) * 0.95).toLocaleString()}`,
-        cashflow: `$${(Number(ledg.balance) * 0.05).toLocaleString()}`,
-        gain: isPositive ? `+$${(Number(ledg.balance) * 0.05).toLocaleString()}` : `-$${(Number(ledg.balance) * 0.05).toLocaleString()}`,
-        realized: '+$0.00',
-        dividends: '+$0.00',
-        bgColor: ledg.source === 'januar' ? 'bg-blue-500' : 'bg-emerald-500',
-        changeType: isPositive ? 'positive' : 'negative'
-      });
+    // 1. Get latest balance per source+currency from balance_ledger
+    const latestBalances: any[] = await prisma.$queryRawUnsafe(`
+      SELECT DISTINCT ON (source, currency)
+        source, currency, 
+        available::float as available,
+        pending::float as pending,
+        (available + pending)::float as total,
+        "snapshotAt"
+      FROM balance_ledger
+      ORDER BY source, currency, "snapshotAt" DESC
+    `);
+
+    // 2. Build summary buckets from real data
+    const summaryBuckets = latestBalances.map((b: any) => {
+      const name = `${(b.source || 'EXTERNAL').toUpperCase()} - ${b.currency}`;
+      const currencySymbol = b.currency === 'EUR' ? '€' : b.currency === 'GBP' ? '£' : '$';
+      const total = b.total || 0;
+      const available = b.available || 0;
+      const pending = b.pending || 0;
+
+      return {
+        name,
+        value: total,
+        valueFormatted: `${currencySymbol}${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        available,
+        availableFormatted: `${currencySymbol}${available.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        pending,
+        pendingFormatted: `${currencySymbol}${pending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        currency: b.currency,
+        source: b.source,
+        bgColor: b.source === 'januar' ? 'bg-blue-500' : 'bg-emerald-500',
+        lastSync: b.snapshotAt,
+      };
+    });
+
+    // 3. Build time-series chart from real balance_ledger snapshots
+    // Group by day, get avg total per source+currency
+    const chartRows: any[] = await prisma.$queryRawUnsafe(`
+      SELECT 
+        "snapshotAt"::date as day,
+        source,
+        currency,
+        AVG((available + pending)::float) as avg_total
+      FROM balance_ledger
+      WHERE "snapshotAt" >= NOW() - INTERVAL '30 days'
+      GROUP BY "snapshotAt"::date, source, currency
+      ORDER BY day ASC
+    `);
+
+    // Pivot into chart format: { date, "JANUAR - EUR": 9467, "FACILITAPAY - COP": 500, ... }
+    const categories = latestBalances.map((b: any) => `${(b.source || 'EXTERNAL').toUpperCase()} - ${b.currency}`);
+    const dayMap = new Map<string, any>();
+
+    for (const row of chartRows) {
+      const dateStr = new Date(row.day).toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+      if (!dayMap.has(dateStr)) {
+        dayMap.set(dateStr, { date: dateStr });
+      }
+      const key = `${(row.source || 'EXTERNAL').toUpperCase()} - ${row.currency}`;
+      dayMap.get(dateStr)[key] = Math.round(row.avg_total * 100) / 100;
     }
 
-    // 2. Fetch TimeSeries data for charts intelligently summing daily
-    const data = [];
-    const now = new Date();
-    for (let i = 30; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
-      
-      const chartRow: any = { date: dateStr };
-      fiatLedgers.forEach((ledg: any) => {
-         const key = `${ledg.source?.toUpperCase() || 'EXTERNAL'} - ${ledg.currency}`;
-         // Fuzz historical data tightly around the current balance mathematically
-         const fuzzed = Number(ledg.balance) * (1 + (Math.random() * 0.2 - 0.1));
-         chartRow[key] = fuzzed;
-      });
-      data.push(chartRow);
+    const chartData = Array.from(dayMap.values());
+
+    // If only 1 day of snapshots, generate a minimal chart with current values
+    if (chartData.length <= 1) {
+      const now = new Date();
+      const singlePoint: any = {
+        date: now.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
+      };
+      for (const b of latestBalances) {
+        const key = `${(b.source || 'EXTERNAL').toUpperCase()} - ${b.currency}`;
+        singlePoint[key] = b.total;
+      }
+      if (chartData.length === 0) chartData.push(singlePoint);
     }
-    
-    // Categories
-    const categories = fiatLedgers.map((l: any) => `${l.source?.toUpperCase() || 'EXTERNAL'} - ${l.currency}`);
+
+    // Total across all accounts
+    const totalValue = latestBalances.reduce((acc: number, b: any) => acc + (b.total || 0), 0);
 
     return {
-      totalUsd: fiatLedgers.reduce((acc: number, curr: any) => acc + Number(curr.balance), 0),
+      totalUsd: totalValue,
       summary: summaryBuckets,
-      chartData: data,
-      categories: categories,
-      colors: ['blue', 'emerald', 'violet', 'fuchsia', 'orange', 'sky']
+      chartData,
+      categories,
+      colors: ['blue', 'emerald', 'violet', 'fuchsia', 'orange', 'sky'],
     };
   }
 }

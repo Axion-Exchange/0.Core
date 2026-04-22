@@ -22,7 +22,7 @@ router.get('/health/dashboard', optionalAuth, async (_req, res, next) => {
 
 router.get('/health/history/:service', optionalAuth, async (req, res, next) => {
   try {
-    const history = await getServiceHistory(req.params.service, 30);
+    const history = await getServiceHistory(String(req.params.service), 30);
     sendSuccess(res, history);
   } catch (err) { next(err); }
 });

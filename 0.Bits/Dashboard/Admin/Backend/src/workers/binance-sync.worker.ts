@@ -234,7 +234,7 @@ class BinanceSyncWorker {
 
       if (staleOrders.length === 0) return;
 
-      const staleIds = new Set(staleOrders.map(o => o.externalOrderId).filter(Boolean));
+      const staleIds = new Set(staleOrders.map((o: any) => o.externalOrderId).filter(Boolean));
       log.info(`Reconciling ${staleIds.size} stale pending orders...`);
 
       // Fetch up to 5 pages of Binance history to find updated statuses

@@ -77,7 +77,7 @@ export class DashboardService {
       const meta = (order.metadata || {}) as Record<string, any>;
       
       return {
-        transaction_id: order.id,
+        transaction_id: order.externalOrderId || order.id,
         // Standardize datetime formatting string for tremor chart indexing
         transaction_date: order.createdAt.toISOString(),
         // Natively fix the COP/MXN chart anomaly by strictly defaulting to the unhedged USDT asset magnitude 
