@@ -91,4 +91,36 @@ router.get('/kyc/users/:userId/status', async (req, res) => {
   }
 });
 
+// ── Third-Party Payment Resolution ────────────────────────────────────────────
+
+// Scan chats for third-party candidates (read-only preview)
+router.post('/third-party/scan', async (_req, res) => {
+  try {
+    const { thirdPartyResolver } = await import('../services/third-party-resolver.service.js');
+    const candidates = await thirdPartyResolver.scanForCandidates();
+    const samePerson = candidates.filter(c => c.matchType === 'SAME_PERSON');
+    const thirdParty = candidates.filter(c => c.matchType === 'THIRD_PARTY');
+    res.json({
+      success: true,
+      total: candidates.length,
+      samePerson: samePerson.length,
+      thirdParty: thirdParty.length,
+      candidates,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Run full resolution (creates users, reassigns volume)
+router.post('/third-party/resolve', async (_req, res) => {
+  try {
+    const { thirdPartyResolver } = await import('../services/third-party-resolver.service.js');
+    const result = await thirdPartyResolver.runFullResolution();
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export const reconciliationRouter = router;

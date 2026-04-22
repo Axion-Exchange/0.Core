@@ -204,6 +204,7 @@ model User {
 
   documents       UserDocument[]
   orders          P2POrder[]     @relation("OrderUser")
+  ordersAsPayer   P2POrder[]     @relation("ActualPayer") // Orders where this user was the actual bank payer
   disputes        P2PDispute[]   @relation("DisputeUser")
   transactions    Transaction[]
   fiatLedgers     FiatLedger[]
@@ -376,11 +377,14 @@ model P2POrder {
   cancelledAt      DateTime?
   cancelReason     String?
   metadata         Json?
+  actualPayerId    String?     @db.Uuid  // Third-party: who actually paid via bank
+  isThirdParty     Boolean     @default(false)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
   advertisement    P2PAdvertisement? @relation(fields: [advertisementId], references: [id])
   user             User?             @relation("OrderUser", fields: [userId], references: [id])
+  actualPayer      User?             @relation("ActualPayer", fields: [actualPayerId], references: [id])
   disputes         P2PDispute[]
   chatMessages     P2PChatMessage[]
 
