@@ -44,6 +44,9 @@ const log = createLogger('server');
 
 const app = express();
 
+// Trust Cloudflare proxy (required for express-rate-limit behind CDN)
+app.set('trust proxy', 1);
+
 // 1. Security headers
 app.use(helmet({
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
@@ -108,7 +111,7 @@ app.use('/api/v1/kyc', authLimiter, kycRouter);
 app.use('/api/v1/pear', authLimiter, pearRouter);
 app.use('/api/v1/reconciliation', authLimiter, reconciliationRouter);
 app.use('/api/v1/fiat', publicLimiter, fiatRouter); // Webhooks are authenticated via HMAC signature, not JWT
-app.use('/api/v1/kyc', publicLimiter, kycWebhookRouter); // Didit webhooks authenticated via HMAC, not JWT
+app.use('/api/v1/webhooks/kyc', publicLimiter, kycWebhookRouter); // Didit webhooks authenticated via HMAC, not JWT
 
 // ── 404 Handler ──────────────────────────────────────
 
