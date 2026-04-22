@@ -207,6 +207,7 @@ model User {
   disputes        P2PDispute[]   @relation("DisputeUser")
   transactions    Transaction[]
   fiatLedgers     FiatLedger[]
+  kycSessions     KycSession[]
 
   @@index([email])
   @@index([externalId])
@@ -238,6 +239,57 @@ model UserDocument {
   @@index([userId])
   @@index([verificationStatus])
   @@map("user_documents")
+}
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │  KYC PROVIDER REGISTRY                                                  │
+// └──────────────────────────────────────────────────────────────────────────┘
+
+/// Registered KYC provider applications (supports multiple apps per provider)
+model KycProvider {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String   // Human-readable: "Axion EUR", "Axion MXN", "Axion GBP"
+  provider      String   // Provider type: "DIDIT", "SUMSUB", "ONFIDO"
+  appId         String   // Provider-specific app/client ID
+  apiKey        String   // API key
+  baseUrl       String   @default("https://verification.didit.me/v3")
+  isActive      Boolean  @default(true)
+  metadata      Json?    // Extra provider-specific config
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions      KycSession[]
+
+  @@unique([provider, appId])
+  @@map("kyc_providers")
+}
+
+/// Cached KYC verification sessions from all providers, unified into single graph
+model KycSession {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerId      String    @db.Uuid
+  externalId      String    // Didit session_id, SumSub applicantId, etc.
+  fullName        String?   // Legal name extracted from ID document
+  normalizedName  String?   // Token-sorted uppercase for fuzzy matching
+  country         String?   @db.VarChar(3) // ISO 3166-1 alpha-3
+  documentType    String?
+  status          String    // APPROVED, DECLINED, IN_REVIEW, EXPIRED, ABANDONED
+  portraitUrl     String?
+  matchedUserId   String?   @db.Uuid
+  matchSimilarity Float?
+  rawPayload      Json?     // Full API response archived for audit
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  provider        KycProvider @relation(fields: [providerId], references: [id])
+  matchedUser     User?       @relation(fields: [matchedUserId], references: [id])
+
+  @@unique([providerId, externalId])
+  @@index([normalizedName])
+  @@index([matchedUserId])
+  @@index([status])
+  @@map("kyc_sessions")
 }
 
 // ┌──────────────────────────────────────────────────────────────────────────┐
