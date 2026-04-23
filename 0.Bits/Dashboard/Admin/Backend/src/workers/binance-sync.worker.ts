@@ -27,25 +27,42 @@ class BinanceSyncWorker {
   private async processTick() {
     if (this.isRunning) return;
     this.isRunning = true;
+    let newOrders = 0;
 
     try {
-      // 1. Ask Binance CCXT service for the latest raw 100 orders
-      if (!binanceService['enabled']) {
-        this.isRunning = false;
-        return;
-      }
+      const activeAccounts = await prisma.p2PAccount.findMany({
+        where: { exchange: 'BINANCE', isActive: true }
+      });
       
-      const response: any = await (binanceService as any).client.sapiGetC2cOrderMatchListUserOrderHistory();
-      if (!response || !response.data || !Array.isArray(response.data)) {
-        this.isRunning = false;
-        return;
+      // Fallback: If no accounts in database, try to sync default one from .env natively 
+      if (activeAccounts.length === 0) {
+        activeAccounts.push({ id: undefined } as any);
       }
 
-      const orders = response.data;
-      let newOrders = 0;
+      for (const account of activeAccounts) {
+        // 1. Ask Binance CCXT service for the latest raw 100 orders
+        const { enabled, client } = binanceService.getClient(account.id ? account : undefined);
+        if (!enabled || !client) {
+          log.warn(`Binance client disabled or missing for account ${account.id || 'default'}`);
+          continue;
+        }
+        
+        let response: any;
+        try {
+          response = await client.sapiGetC2cOrderMatchListUserOrderHistory();
+        } catch (e: any) {
+          log.error(`Failed to fetch orders for account ${account.id || 'default'}: ${e.message}`);
+          continue;
+        }
 
-      // 2. Iterate backwards (to process oldest first organically) or simply upsert all safely
-      for (const order of orders) {
+        if (!response || !response.data || !Array.isArray(response.data)) {
+          continue;
+        }
+
+        const orders = response.data;
+
+        // 2. Iterate backwards (to process oldest first organically) or simply upsert all safely
+        for (const order of orders) {
         // Evaluate native params
         // Binance orderStatus mappings: COMPLETED, CANCELLED, PENDING, etc
         let mappedStatus: OrderStatus = OrderStatus.PENDING_FIAT;
@@ -65,7 +82,7 @@ class BinanceSyncWorker {
 
         // Extract native Binance Legal Identities dynamically on missed records
         if (!counterpartyNameStr && mappedStatus === OrderStatus.COMPLETED) {
-           const names = await binanceService.fetchTrueLegalName(order.orderNumber);
+           const names = await binanceService.fetchTrueLegalName(order.orderNumber, account.id ? account : undefined);
            if (names) {
               // Priority map to the valid side
               counterpartyNameStr = order.tradeType === 'BUY' ? names.sellerName : names.buyerName;
@@ -141,6 +158,7 @@ class BinanceSyncWorker {
           create: {
             externalOrderId: order.orderNumber,
             userId: userNodeId,
+            accountId: account.id || null, // INJECT ACCOUNT ID
             asset: order.asset, // 'USDT'
             fiat: order.fiat, // 'EUR'
             amount: cryptoAmount, 
@@ -157,6 +175,7 @@ class BinanceSyncWorker {
           },
           update: {
             userId: userNodeId, // Retain rigid map consistently uniquely!
+            accountId: account.id || null, // RETAIN ACCOUNT ID
             status: mappedStatus,
             counterparty: counterpartyNickname, // Overwrite dynamically if Real Name unlocked successfully natively
             counterpartyName: counterpartyNameStr, // Inject dynamically onto existing backwards-synced trades
@@ -169,7 +188,7 @@ class BinanceSyncWorker {
         // └─────────────────────────────────────────────────────────┘
         // Bypass the rigid 30-day loop where organically available.
         try {
-            const chatLog = await binanceService.fetchChatMessages(order.orderNumber);
+            const chatLog = await binanceService.fetchChatMessages(order.orderNumber, account.id ? account : undefined);
             if (chatLog && chatLog.length > 0) {
                for (const msg of chatLog) {
                   await prisma.p2PChatMessage.upsert({
@@ -197,6 +216,9 @@ class BinanceSyncWorker {
         }
 
         newOrders++;
+      }
+      
+      // End of inner account loop
       }
 
       if (newOrders > 0) {
