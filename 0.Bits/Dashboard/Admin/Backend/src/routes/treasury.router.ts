@@ -144,7 +144,7 @@ router.get('/export-capital-flows', async (req, res, next) => {
 
     res.header('Content-Type', 'text/csv');
     res.attachment(`capital_flows_export_${new Date().toISOString()}.csv`);
-    return res.send(csvData);
+    res.send(csvData);
   } catch (err) { next(err); }
 });
 
