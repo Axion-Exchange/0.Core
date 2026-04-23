@@ -298,7 +298,9 @@ router.post('/export-data', async (req, res, next) => {
             let txt = `Chat Transcript for Order ${order.externalOrderId}\n\n`;
             if (chats && chats.data && Array.isArray(chats.data)) {
               for (const msg of chats.data) {
-                txt += `[${new Date(msg.createTime).toISOString()}] ${msg.role}: ${msg.content}\n`;
+                const dateStr = new Date(Number(msg.createTime)).toISOString();
+                const sender = msg.self ? 'You' : (msg.fromNickName || 'Counterparty');
+                txt += `[${dateStr}] ${sender}: ${msg.content}\n`;
               }
             } else {
               txt += "No messages found or API error.\n";
