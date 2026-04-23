@@ -130,7 +130,7 @@ export class DiditService {
     try {
       const apiKey = provider.apiKey;
       // Attempting PDF endpoint as per standard API structures
-      const pdfUrl = `${provider.baseUrl.replace(/\/$/, '')}/session/${sessionId}/pdf/`;
+      const pdfUrl = `${provider.baseUrl.replace(/\/$/, '')}/session/${sessionId}/generate-pdf/`;
       
       const res = await fetch(pdfUrl, {
         method: 'GET',
