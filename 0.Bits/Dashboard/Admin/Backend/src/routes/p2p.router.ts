@@ -22,24 +22,23 @@ router.get('/accounts', optionalAuth, async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// All other P2P routes require strict authentication
-router.use(requireAuth);
+// P2P Mutations require strict authentication
 
-router.post('/accounts', validateBody(createAccountSchema), async (req, res, next) => {
+router.post('/accounts', requireAuth, validateBody(createAccountSchema), async (req, res, next) => {
   try {
     const account = await p2pService.createAccount(req.body);
     sendSuccess(res, account, 201);
   } catch (err) { next(err); }
 });
 
-router.put('/accounts/:id', validateParams(idParamSchema), async (req, res, next) => {
+router.put('/accounts/:id', requireAuth, validateParams(idParamSchema), async (req, res, next) => {
   try {
     const account = await p2pService.updateAccount(param(req, 'id'), req.body);
     sendSuccess(res, account);
   } catch (err) { next(err); }
 });
 
-router.delete('/accounts/:id', validateParams(idParamSchema), async (req, res, next) => {
+router.delete('/accounts/:id', requireAuth, validateParams(idParamSchema), async (req, res, next) => {
   try {
     await p2pService.deleteAccount(param(req, 'id'));
     sendSuccess(res, { message: 'Account deleted' });
@@ -48,7 +47,7 @@ router.delete('/accounts/:id', validateParams(idParamSchema), async (req, res, n
 
 // ── Advertisements ───────────────────────────────────
 
-router.get('/ads', async (req, res, next) => {
+router.get('/ads', optionalAuth, async (req, res, next) => {
   try {
     const result = await p2pService.listAds(req.query as any);
     const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
@@ -56,21 +55,21 @@ router.get('/ads', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/ads', validateBody(createAdSchema), async (req, res, next) => {
+router.post('/ads', requireAuth, validateBody(createAdSchema), async (req, res, next) => {
   try {
     const ad = await p2pService.createAd(req.body);
     sendSuccess(res, ad, 201);
   } catch (err) { next(err); }
 });
 
-router.put('/ads/:id', validateParams(idParamSchema), validateBody(updateAdSchema), async (req, res, next) => {
+router.put('/ads/:id', requireAuth, validateParams(idParamSchema), validateBody(updateAdSchema), async (req, res, next) => {
   try {
     const ad = await p2pService.updateAd(param(req, 'id'), req.body);
     sendSuccess(res, ad);
   } catch (err) { next(err); }
 });
 
-router.put('/ads/:id/toggle', validateParams(idParamSchema), validateBody(toggleAdSchema), async (req, res, next) => {
+router.put('/ads/:id/toggle', requireAuth, validateParams(idParamSchema), validateBody(toggleAdSchema), async (req, res, next) => {
   try {
     const ad = await p2pService.toggleAd(param(req, 'id'), req.body.enabled);
     sendSuccess(res, ad);
@@ -79,7 +78,7 @@ router.put('/ads/:id/toggle', validateParams(idParamSchema), validateBody(toggle
 
 // ── Orders ───────────────────────────────────────────
 
-router.get('/orders', async (req, res, next) => {
+router.get('/orders', optionalAuth, async (req, res, next) => {
   try {
     const result = await p2pService.listOrders(req.query as any);
     const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
@@ -87,14 +86,14 @@ router.get('/orders', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/orders/:id', validateParams(idParamSchema), async (req, res, next) => {
+router.get('/orders/:id', optionalAuth, validateParams(idParamSchema), async (req, res, next) => {
   try {
     const order = await p2pService.getOrder(param(req, 'id'));
     sendSuccess(res, order);
   } catch (err) { next(err); }
 });
 
-router.put('/orders/:id/release', validateParams(idParamSchema), async (req, res, next) => {
+router.put('/orders/:id/release', requireAuth, validateParams(idParamSchema), async (req, res, next) => {
   try {
     const order = await p2pService.updateOrderStatus(param(req, 'id'), 'RELEASED');
     sendSuccess(res, order);
