@@ -65,6 +65,7 @@ interface MatchResult {
   status: KYCStatus;
   similarity: number;
   country?: string;
+  email?: string;
 }
 
 export class DiditKycMatcherService {
@@ -143,6 +144,15 @@ export class DiditKycMatcherService {
       const sessionNorm = normalizeName(session.full_name);
       const mapStatus = this.mapStatus(session.status);
       
+      let email: string | undefined;
+      if (session.email_address) {
+        if (typeof session.email_address === 'string') {
+          email = session.email_address;
+        } else if (session.email_address.email) {
+          email = session.email_address.email;
+        }
+      }
+
       // 1. Exact normalized match (fastest path)
       const exactMatch = userMap.get(sessionNorm);
       if (exactMatch && !matchedUserIds.has(exactMatch.id)) {
@@ -154,6 +164,7 @@ export class DiditKycMatcherService {
           status: mapStatus,
           similarity: 1.0,
           country: session.country,
+          email: email,
         });
         matchedUserIds.add(exactMatch.id);
         continue;
@@ -184,6 +195,7 @@ export class DiditKycMatcherService {
           status: mapStatus,
           similarity: bestSim,
           country: session.country,
+          email: email,
         });
         matchedUserIds.add(bestMatch.id);
       }
@@ -204,6 +216,7 @@ export class DiditKycMatcherService {
         data: {
           kycStatus: match.status,
           country: match.country || undefined,
+          email: match.email || undefined,
           metadata: {
             diditSessionId: match.sessionId,
             diditFullName: match.diditName,
