@@ -104,9 +104,16 @@ router.get('/export-capital-flows', async (req, res, next) => {
       typeFilter = { in: requestedTypes };
     }
 
+    let accountFilter = undefined;
+    if (req.query.accounts && typeof req.query.accounts === 'string') {
+      const requestedAccounts = req.query.accounts.split(',');
+      accountFilter = { label: { in: requestedAccounts } };
+    }
+
     const where: any = {};
     if (Object.keys(dateFilter).length > 0) where.timestamp = dateFilter;
     if (typeFilter) where.type = typeFilter;
+    if (accountFilter) where.account = accountFilter;
 
     // We must fetch from both ExchangeCapitalFlow AND BalanceLedger (if "ACCOUNT_BALANCES" is requested)
     const { prisma } = await import('../lib/db.js');
@@ -129,6 +136,7 @@ router.get('/export-capital-flows', async (req, res, next) => {
     if (!typeFilter || typeFilter.in.includes('ACCOUNT_BALANCES')) {
       const balanceWhere: any = {};
       if (Object.keys(dateFilter).length > 0) balanceWhere.snapshotAt = dateFilter;
+      if (accountFilter) balanceWhere.account = accountFilter;
       
       const balances = await prisma.balanceLedger.findMany({
         where: balanceWhere,
