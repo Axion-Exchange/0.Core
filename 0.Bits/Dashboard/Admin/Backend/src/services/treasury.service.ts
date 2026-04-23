@@ -66,7 +66,7 @@ export class TreasuryService {
 
     const portfolios = await prisma.portfolio.findMany({ where });
     if (portfolios.length === 0) return [];
-    const portfolioIds = portfolios.map(p => p.id);
+    const portfolioIds = portfolios.map((p: any) => p.id);
 
     return prisma.balanceSnapshot.findMany({
       where: {
@@ -136,7 +136,7 @@ export class TreasuryService {
     // Advisory lock prevents concurrent portfolio mutations for the same currency.
     return withAdvisoryLock(LOCK_NS.USER_BALANCE, `portfolio:${currency}`, async (tx) => {
       return tx.portfolio.upsert({
-        where: { currency },
+        where: { currency } as any,
         create: {
           currency,
           totalBalance: data.totalBalance,

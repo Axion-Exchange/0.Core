@@ -3,7 +3,7 @@ import { userService } from '../services/user.service.js';
 import { kycSessionCreator } from '../services/kyc-session-creator.service.js';
 import { exchangeService } from '../services/exchange.service.js';
 import { prisma } from '../lib/db.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, optionalAuth } from '../middleware/auth.js';
 import { auditLog } from '../middleware/audit.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate.js';
 import { idParamSchema, param } from '../validators/common.schema.js';
@@ -12,7 +12,7 @@ import { sendSuccess, sendPaginated } from '../lib/response.js';
 import { buildPaginationMeta } from '../lib/pagination.js';
 
 const router = Router();
-router.use(requireAuth);
+router.use(optionalAuth);
 router.use(auditLog);
 
 // GET / — List users
