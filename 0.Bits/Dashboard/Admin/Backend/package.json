@@ -28,6 +28,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@prisma/client": "^6.4.1",
+    "archiver": "^7.0.1",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^12.9.0",
     "bullmq": "^5.75.2",
@@ -52,6 +53,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",

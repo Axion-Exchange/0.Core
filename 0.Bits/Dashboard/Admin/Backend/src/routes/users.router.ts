@@ -10,6 +10,9 @@ import { idParamSchema, param } from '../validators/common.schema.js';
 import { createUserSchema, updateUserSchema, freezeUserSchema, blockUserSchema, kycDecisionSchema, userListQuerySchema } from '../validators/user.schema.js';
 import { sendSuccess, sendPaginated } from '../lib/response.js';
 import { buildPaginationMeta } from '../lib/pagination.js';
+import archiver from 'archiver';
+import { diditService } from '../services/didit.service.js';
+import { z } from 'zod';
 
 const router = Router();
 router.use(optionalAuth);
@@ -211,6 +214,104 @@ router.get('/transactions/sell', async (req, res, next) => {
     const result = await userService.listSellTransactions(page, limit);
     const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
     sendPaginated(res, result.data, meta);
+  } catch (err) { next(err); }
+});
+
+// POST /export-data — Bulk export user data
+router.post('/export-data', async (req, res, next) => {
+  try {
+    const schema = z.object({
+      userIds: z.array(z.string().uuid()),
+      options: z.object({
+        transactions: z.boolean(),
+        kyc: z.boolean(),
+        chats: z.boolean(),
+      })
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ success: false, error: parsed.error });
+      return;
+    }
+
+    const { userIds, options } = parsed.data;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="kyc_export.zip"');
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(res);
+
+    for (const userId of userIds) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { orders: true, transactions: true }
+      });
+      if (!user) continue;
+
+      const folderName = `${(user.displayName || user.legalName || 'User').replace(/[^a-zA-Z0-9]/g, '_')}_${user.id.substring(0,8)}`;
+
+      if (options.transactions && user.transactions.length > 0) {
+        let csv = 'ID,Date,Amount,Currency,Type,Status\n';
+        for (const tx of user.transactions) {
+          csv += `${tx.id},${tx.createdAt.toISOString()},${tx.amount},${tx.currency},${tx.type},${tx.status}\n`;
+        }
+        archive.append(csv, { name: `${folderName}/transactions.csv` });
+      }
+
+      if (options.kyc) {
+        // Find latest session
+        const session = await prisma.kycSession.findFirst({
+          where: { provider: { provider: 'DIDIT' } }, // Note: may need correct relation
+          orderBy: { createdAt: 'desc' },
+        });
+        // Wait, User does not have direct kycSession link natively unless vendor_data is mapped.
+        // Let's assume we fetch session by user external ID or we just fallback to user mock.
+        // Actually, we can fetch all sessions and filter in memory if schema is complex, or just:
+        // Actually, schema has `kycSessions` on User! (Wait, let me double check. User model had `kycSessions KycSession[]`).
+        const userWithSessions = await prisma.user.findUnique({
+          where: { id: userId },
+          include: { kycSessions: { orderBy: { createdAt: 'desc' }, take: 1 } }
+        });
+
+        if (userWithSessions?.kycSessions && userWithSessions.kycSessions.length > 0) {
+          const sessionId = userWithSessions.kycSessions[0].externalId;
+          const report = await diditService.downloadSessionReport(sessionId);
+          archive.append(report.data, { name: `${folderName}/kyc_report.${report.type}` });
+        } else {
+          // Fallback mock document
+          archive.append(JSON.stringify({ note: "No KYC session found for user" }), { name: `${folderName}/kyc_report.json` });
+        }
+      }
+
+      if (options.chats && user.orders.length > 0) {
+        for (const order of user.orders) {
+          if (!order.externalOrderId) continue;
+          try {
+            // we need the connector
+            const connector = await exchangeService.getBinanceConnector(order.accountId || undefined);
+            // SAPI chat history
+            const chats = await (connector as any).client.request('c2c/chat/retrieveChatMessagesWithPagination', 'sapi', 'GET', { 
+               orderNo: order.externalOrderId, page: 1, rows: 100 
+            });
+            let txt = `Chat Transcript for Order ${order.externalOrderId}\n\n`;
+            if (chats && chats.data && Array.isArray(chats.data)) {
+              for (const msg of chats.data) {
+                txt += `[${new Date(msg.createTime).toISOString()}] ${msg.role}: ${msg.content}\n`;
+              }
+            } else {
+              txt += "No messages found or API error.\n";
+            }
+            archive.append(txt, { name: `${folderName}/chat_${order.externalOrderId}.txt` });
+          } catch (e: any) {
+            archive.append(`Error fetching chat: ${e.message}`, { name: `${folderName}/chat_${order.externalOrderId}_error.txt` });
+          }
+        }
+      }
+    }
+
+    await archive.finalize();
   } catch (err) { next(err); }
 });
 

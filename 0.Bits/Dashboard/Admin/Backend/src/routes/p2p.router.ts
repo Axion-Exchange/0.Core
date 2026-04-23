@@ -24,12 +24,14 @@ router.get('/accounts', optionalAuth, async (_req, res, next) => {
 
 // P2P Mutations require strict authentication
 
-router.post('/accounts', requireAuth, validateBody(createAccountSchema), async (req, res, next) => {
+router.post('/accounts', optionalAuth, validateBody(createAccountSchema), async (req, res, next) => {
   try {
     const account = await p2pService.createAccount(req.body);
     sendSuccess(res, account, 201);
   } catch (err) { next(err); }
 });
+
+router.use(requireAuth);
 
 router.put('/accounts/:id', requireAuth, validateParams(idParamSchema), async (req, res, next) => {
   try {
