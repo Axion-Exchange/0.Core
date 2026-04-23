@@ -103,6 +103,12 @@ createWorker(QUEUE_NAMES.BITGET_SPOT_SYNC, async () => {
   await bitgetSpotWorker.run();
 });
 
+// ── MEXC Spot Worker ─────────────────────────────────────
+createWorker(QUEUE_NAMES.MEXC_SPOT_SYNC, async () => {
+  const { mexcSpotWorker } = await import("./workers/mexc-spot.worker.js");
+  await mexcSpotWorker.run();
+});
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {
