@@ -5,6 +5,9 @@ import { NotFoundError } from '../middleware/error.js';
 import type { AdStatus, OrderStatus, DisputeStatus, Prisma } from '@prisma/client';
 import { binanceService } from './binance.service.js';
 import { getSocket } from '../lib/socket.js';
+import { config } from '../config/index.js';
+import { logger } from '../lib/logger.js';
+import fs from 'fs';
 
 export class P2PService {
   // ── Accounts ───────────────────────────────────────────
@@ -14,6 +17,42 @@ export class P2PService {
       include: { _count: { select: { advertisements: true, wallets: true } } },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async seedEnvAccountIfNeeded() {
+    try {
+      const hasRsaKey = config.BINANCE_API_KEY && config.BINANCE_API_PRIVATE_KEY_PATH;
+      const hasHmacKey = config.BINANCE_API_KEY && config.BINANCE_API_SECRET;
+
+      if (!hasRsaKey && !hasHmacKey) return;
+
+      const binanceAccounts = await prisma.p2PAccount.findMany({
+        where: { exchange: 'BINANCE' }
+      });
+
+      if (binanceAccounts.length > 0) return; // Accounts already exist
+
+      let apiSecret = '';
+      if (hasRsaKey) {
+        apiSecret = fs.readFileSync(config.BINANCE_API_PRIVATE_KEY_PATH!, 'utf8');
+      } else if (hasHmacKey) {
+        apiSecret = config.BINANCE_API_SECRET!;
+      }
+
+      await prisma.p2PAccount.create({
+        data: {
+          exchange: 'BINANCE',
+          label: 'Default Binance (ENV)',
+          apiKeyEnc: encrypt(config.BINANCE_API_KEY!),
+          apiSecretEnc: encrypt(apiSecret),
+          region: 'Global',
+          isActive: true,
+        }
+      });
+      logger.info('[P2PService] Successfully seeded .env credentials into P2PAccount table.');
+    } catch (error) {
+      logger.error('[P2PService] Error seeding .env account:', error);
+    }
   }
 
   async createAccount(data: { exchange: string; label: string; apiKey: string; apiSecret: string; passphrase?: string; region?: string }) {

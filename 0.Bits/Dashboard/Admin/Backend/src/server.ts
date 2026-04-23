@@ -20,6 +20,7 @@ import hpp from 'hpp';
 // Routers
 import { authRouter } from './routes/auth.router.js';
 import { p2pRouter } from './routes/p2p.router.js';
+import { p2pService } from './services/p2p.service.js';
 import { treasuryRouter } from './routes/treasury.router.js';
 import { usersRouter } from './routes/users.router.js';
 import { operationsRouter } from './routes/operations.router.js';
@@ -144,6 +145,9 @@ initSocket(httpServer);
 
 // Initialize feature flags in Redis
 featureFlags.initialize().catch((err) => log.error("Feature flags init failed:", err));
+
+// Auto-seed .env credentials into the database
+p2pService.seedEnvAccountIfNeeded().catch((err) => log.error("Seed account failed:", err));
 
 // Start real-time PnL WebSocket emitter
 startPnLEmitter();

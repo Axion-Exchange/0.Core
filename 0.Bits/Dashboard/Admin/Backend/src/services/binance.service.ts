@@ -3,41 +3,21 @@ import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
 import { decrypt } from '../lib/crypto.js';
 import { P2PAccount } from '@prisma/client';
+import { prisma } from '../lib/db.js';
 import * as crypto from 'crypto';
 import fs from 'fs';
 
 export class BinanceService {
-  private defaultClient: any;
-  private defaultEnabled: boolean = false;
-
   constructor() {
-    const hasRsaKey = config.BINANCE_API_KEY && config.BINANCE_API_PRIVATE_KEY_PATH;
-    const hasHmacKey = config.BINANCE_API_KEY && config.BINANCE_API_SECRET;
+    // defaultClient from .env is deprecated. We now rely on P2PAccount from the DB.
+  }
 
-    if (hasRsaKey) {
-      const privateKeyPem = fs.readFileSync(config.BINANCE_API_PRIVATE_KEY_PATH!, 'utf8');
-      this.defaultClient = new ccxt.binance({
-        apiKey: config.BINANCE_API_KEY,
-        secret: privateKeyPem,
-        enableRateLimit: true,
-      });
-      this.defaultEnabled = true;
-      logger.info('[BinanceService] Initialized with RSA key authentication.');
-    } else if (hasHmacKey) {
-      this.defaultClient = new ccxt.binance({
-        apiKey: config.BINANCE_API_KEY,
-        secret: config.BINANCE_API_SECRET,
-        enableRateLimit: true,
-      });
-      this.defaultEnabled = true;
-    } else {
-      logger.warn('[BinanceService] BINANCE_API_KEY is missing. CCXT Integration is Disabled.');
-      this.defaultClient = new ccxt.binance();
-    }
+  async getDefaultAccount(): Promise<P2PAccount | undefined> {
+    return prisma.p2PAccount.findFirst({ where: { exchange: 'BINANCE' } }) || undefined;
   }
 
   public getClient(account?: P2PAccount): { client: any, enabled: boolean, rsaPem?: string } {
-    if (!account) return { client: this.defaultClient, enabled: this.defaultEnabled, rsaPem: config.BINANCE_API_PRIVATE_KEY_PATH ? fs.readFileSync(config.BINANCE_API_PRIVATE_KEY_PATH, 'utf8') : undefined };
+    if (!account) return { client: new ccxt.binance(), enabled: false };
     
     try {
       const apiKey = decrypt(account.apiKeyEnc);
@@ -52,8 +32,7 @@ export class BinanceService {
       });
       return { client, enabled: true, rsaPem: isRsa ? apiSecret : undefined };
     } catch(err) {
-      logger.error(`[BinanceService] Failed to initialize client for account ${account.id}`, err);
-      return { client: this.defaultClient, enabled: false };
+      return { client: new ccxt.binance(), enabled: false };
     }
   }
 
@@ -61,7 +40,8 @@ export class BinanceService {
    * Binance SAPI endpoint to extract True Legal Identity from order details.
    */
   async fetchTrueLegalName(orderNumber: string, account?: P2PAccount): Promise<{ buyerName?: string, sellerName?: string, createTime?: number } | null> {
-    const { enabled, rsaPem, client } = this.getClient(account);
+    const targetAccount = account || await this.getDefaultAccount();
+    const { enabled, rsaPem, client } = this.getClient(targetAccount);
     if (!enabled) return null;
     
     try {
@@ -111,7 +91,8 @@ export class BinanceService {
    * Fetches real Funding wallet balances from Binance
    */
   async fetchFundingBalances(account?: P2PAccount) {
-    const { enabled, client } = this.getClient(account);
+    const targetAccount = account || await this.getDefaultAccount();
+    const { enabled, client } = this.getClient(targetAccount);
     if (!enabled) return [];
     
     try {
@@ -139,7 +120,8 @@ export class BinanceService {
    * Directly fetches authenticated user order history for P2P off Binance servers
    */
   async fetchP2PVolume(account?: P2PAccount) {
-    const { enabled, client } = this.getClient(account);
+    const targetAccount = account || await this.getDefaultAccount();
+    const { enabled, client } = this.getClient(targetAccount);
     if (!enabled) return [];
 
     try {
@@ -174,7 +156,8 @@ export class BinanceService {
    * Supports multi-account by accepting a P2PAccount parameter.
    */
   async fetchMerchantAds(account?: P2PAccount): Promise<any[]> {
-    const { enabled, client } = this.getClient(account);
+    const targetAccount = account || await this.getDefaultAccount();
+    const { enabled, client } = this.getClient(targetAccount);
     if (!enabled) return [];
 
     try {
@@ -207,7 +190,8 @@ export class BinanceService {
    * status: 1 = Online (Active), 2 = Offline (Paused)
    */
   async toggleAdStatus(adNumber: string, status: 'Active' | 'Paused', account?: P2PAccount): Promise<boolean> {
-    const { enabled, client } = this.getClient(account);
+    const targetAccount = account || await this.getDefaultAccount();
+    const { enabled, client } = this.getClient(targetAccount);
     if (!enabled) return false;
 
     try {
@@ -232,7 +216,9 @@ export class BinanceService {
    * Note: This will naturally drop an exception alerting the service layer if the exact SAPI URL signature isn't mapped functionally natively!
    */
   async fetchChatMessages(orderId: string, account?: P2PAccount): Promise<any[]> {
-    const { client } = this.getClient(account);
+    const targetAccount = account || await this.getDefaultAccount();
+    const { enabled, client } = this.getClient(targetAccount);
+    if (!enabled) return [];
     try {
       // Removed the strict CCXT .has[] check because CCXT lacks explicit definitions for the V7.4 SAPI chat pagination array.
       // We natively execute the raw request against Binance's Gateway bypassing the implicit wrapper.
