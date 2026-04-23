@@ -26,7 +26,7 @@ class BitgetSpotWorker {
       const res = await fetch('https://api.bitget.com/api/v2/spot/market/tickers?symbol=USDTEUR');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       
-      const json = await res.json();
+      const json: any = await res.json();
       
       if (json.code === '00000' && json.data && json.data.length > 0) {
         const data = json.data[0];
