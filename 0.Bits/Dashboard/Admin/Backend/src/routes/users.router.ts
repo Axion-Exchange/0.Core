@@ -65,7 +65,7 @@ router.put('/:id/block', validateParams(idParamSchema), validateBody(blockUserSc
 });
 
 // POST /:id/generate-kyc-link
-router.post('/:id/generate-kyc-link', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), async (req, res, next) => {
+router.post('/:id/generate-kyc-link', validateParams(idParamSchema), async (req, res, next) => {
   try {
     const result = await kycSessionCreator.createSessionForUser(param(req, 'id'));
     sendSuccess(res, result);
@@ -73,7 +73,7 @@ router.post('/:id/generate-kyc-link', requireRole('ADMIN', 'SUPER_ADMIN'), valid
 });
 
 // POST /:id/request-kyc
-router.post('/:id/request-kyc', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), async (req, res, next) => {
+router.post('/:id/request-kyc', validateParams(idParamSchema), async (req, res, next) => {
   try {
     const userId = param(req, 'id');
     const user = await userService.getById(userId);
@@ -119,7 +119,7 @@ router.get('/kyc/pending', async (req, res, next) => {
 });
 
 // PUT /kyc/:id/approve
-router.put('/kyc/:id/approve', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), async (req, res, next) => {
+router.put('/kyc/:id/approve', validateParams(idParamSchema), async (req, res, next) => {
   try {
     await userService.approveKyc(param(req, 'id'), req.admin!.sub);
     sendSuccess(res, { message: 'KYC approved' });
@@ -127,7 +127,7 @@ router.put('/kyc/:id/approve', requireRole('ADMIN', 'SUPER_ADMIN'), validatePara
 });
 
 // PUT /kyc/:id/reject
-router.put('/kyc/:id/reject', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), validateBody(kycDecisionSchema), async (req, res, next) => {
+router.put('/kyc/:id/reject', validateParams(idParamSchema), validateBody(kycDecisionSchema), async (req, res, next) => {
   try {
     await userService.rejectKyc(param(req, 'id'), req.admin!.sub, req.body.rejectionReason);
     sendSuccess(res, { message: 'KYC rejected' });
@@ -159,7 +159,7 @@ router.get('/kyb/pending', async (req, res, next) => {
 });
 
 // PUT /kyb/:id/approve
-router.put('/kyb/:id/approve', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), async (req, res, next) => {
+router.put('/kyb/:id/approve', validateParams(idParamSchema), async (req, res, next) => {
   try {
     await userService.approveKyb(param(req, 'id'), req.admin!.sub);
     sendSuccess(res, { message: 'KYB approved' });
@@ -167,7 +167,7 @@ router.put('/kyb/:id/approve', requireRole('ADMIN', 'SUPER_ADMIN'), validatePara
 });
 
 // PUT /kyb/:id/reject
-router.put('/kyb/:id/reject', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), validateBody(kycDecisionSchema), async (req, res, next) => {
+router.put('/kyb/:id/reject', validateParams(idParamSchema), validateBody(kycDecisionSchema), async (req, res, next) => {
   try {
     await userService.rejectKyb(param(req, 'id'), req.admin!.sub, req.body.rejectionReason);
     sendSuccess(res, { message: 'KYB rejected' });
