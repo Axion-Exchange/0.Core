@@ -874,3 +874,13 @@ model PnlSnapshot {
   @@index([accountId])
   @@map("pnl_snapshots")
 }
+
+/// Dynamic key-value store for application configuration and external data (e.g., exchange rates).
+model SystemSetting {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}

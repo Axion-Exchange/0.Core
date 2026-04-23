@@ -53,7 +53,7 @@ router.get('/ads', optionalAuth, async (req, res, next) => {
   try {
     const result = await p2pService.listAds(req.query as any);
     const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
-    sendPaginated(res, result.data, meta);
+    sendPaginated(res, result.data, { ...meta, ...result.meta });
   } catch (err) { next(err); }
 });
 

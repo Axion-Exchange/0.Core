@@ -92,6 +92,12 @@ createWorker(QUEUE_NAMES.FRAUD_SCAN, async () => {
   await runFraudScan();
 });
 
+// ── Bitget Spot Worker ───────────────────────────────────
+createWorker(QUEUE_NAMES.BITGET_SPOT_SYNC, async () => {
+  const { bitgetSpotWorker } = await import("./workers/bitget-spot.worker.js");
+  await bitgetSpotWorker.run();
+});
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {

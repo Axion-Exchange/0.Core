@@ -36,6 +36,7 @@ export const QUEUE_NAMES = {
   HEALTH_CHECK: 'health-check',
   BIGQUERY_SYNC: 'bigquery-sync',
   FRAUD_SCAN: 'fraud-scan',
+  BITGET_SPOT_SYNC: 'bitget-spot-sync',
 } as const;
 
 type QueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];
@@ -130,6 +131,7 @@ export async function registerRepeatableJobs(): Promise<void> {
     { queue: QUEUE_NAMES.HEALTH_CHECK,  every: 300000,  name: 'health-check-tick' },
     { queue: QUEUE_NAMES.BIGQUERY_SYNC,   every: 21600000, name: 'bq-sync-tick' },
     { queue: QUEUE_NAMES.FRAUD_SCAN,      every: 21600000, name: 'fraud-scan-tick' },
+    { queue: QUEUE_NAMES.BITGET_SPOT_SYNC, every: 600000, name: 'bitget-spot-tick' },
   ];
 
   for (const { queue, every, name } of schedules) {
