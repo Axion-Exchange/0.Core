@@ -2,6 +2,7 @@ import { prisma } from '../lib/db.js';
 import { config } from '../config/index.js';
 import { createLogger } from '../lib/logger.js';
 import { KYCStatus } from '@prisma/client';
+import { diditService } from './didit.service.js';
 
 const log = createLogger('didit-kyc-matcher');
 
@@ -153,6 +154,16 @@ export class DiditKycMatcherService {
         }
       }
 
+      // If email not in summary, fetch full decision and extract it recursively
+      if (!email) {
+        try {
+          const fullDecision = await diditService.getSessionDecision(session.session_id);
+          email = this.findEmailDeep(fullDecision);
+        } catch (err) {
+          log.warn(`[DiditMatcher] Failed to fetch full decision for email extraction: ${session.session_id}`);
+        }
+      }
+
       // 1. Exact normalized match (fastest path)
       const exactMatch = userMap.get(sessionNorm);
       if (exactMatch && !matchedUserIds.has(exactMatch.id)) {
@@ -280,6 +291,20 @@ export class DiditKycMatcherService {
     if (s === 'PENDING' || s === 'IN_PROGRESS' || s === 'IN PROGRESS') return KYCStatus.PENDING;
     if (s === 'EXPIRED') return KYCStatus.EXPIRED;
     return KYCStatus.PENDING;
+  }
+
+  private findEmailDeep(obj: any): string | undefined {
+    if (!obj || typeof obj !== 'object') return undefined;
+    
+    if (obj.email && typeof obj.email === 'string' && obj.email.includes('@')) return obj.email;
+    if (obj.email_address && typeof obj.email_address === 'string' && obj.email_address.includes('@')) return obj.email_address;
+    if (obj.email_address?.email && typeof obj.email_address.email === 'string') return obj.email_address.email;
+    
+    for (const key of Object.keys(obj)) {
+      const found = this.findEmailDeep(obj[key]);
+      if (found) return found;
+    }
+    return undefined;
   }
 }
 
