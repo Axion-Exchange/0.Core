@@ -1,6 +1,7 @@
 import { prisma } from '../lib/db.js';
 import { createLogger } from '../lib/logger.js';
 import { KYCStatus } from '@prisma/client';
+import { diditService } from './didit.service.js';
 
 const log = createLogger('kyc-orchestrator');
 
@@ -453,7 +454,6 @@ export class KycOrchestratorService {
         let finalStatus = sess.status;
         let email: string | undefined;
         try {
-          const { diditService } = require('./didit.service.js');
           const fullDecision = await diditService.getSessionDecision(sess.externalId);
           if (fullDecision && fullDecision.status) {
             finalStatus = fullDecision.status;
@@ -548,12 +548,13 @@ export class KycOrchestratorService {
         let finalStatus = newStatus;
         if (currentStatus === 'APPROVED' && (newStatus === 'PENDING' || newStatus === 'IN_REVIEW')) {
             try {
-              const { diditService } = require('./didit.service.js');
               const decision = await diditService.getSessionDecision(sess.externalId);
               if (decision && decision.status) {
                  finalStatus = this.mapStatus(decision.status);
               }
-            } catch (e) {}
+            } catch (e) {
+              log.warn(`[Orchestrator] Failed to fetch decision for status check:`, e);
+            }
         }
         
         if (finalStatus !== currentStatus) {
