@@ -89,7 +89,7 @@ export class P2PService {
     if (filters?.fiat) where.fiat = filters.fiat;
     if (filters?.type) where.type = filters.type as any;
 
-    const [data, total, bitgetSetting, mexcSetting] = await Promise.all([
+    const [data, total, bitgetSetting, binanceMxnSetting] = await Promise.all([
       prisma.p2PAdvertisement.findMany({
         where,
         include: { account: { select: { exchange: true, label: true } } },
@@ -99,14 +99,14 @@ export class P2PService {
       }),
       prisma.p2PAdvertisement.count({ where }),
       prisma.systemSetting.findUnique({ where: { key: 'BITGET_SPOT_USDTEUR_MID' } }),
-      prisma.systemSetting.findUnique({ where: { key: 'MEXC_SPOT_USDTMXN_MID' } })
+      prisma.systemSetting.findUnique({ where: { key: 'BINANCE_SPOT_USDTMXN_MID' } })
     ]);
 
     return { 
       data, total, page, limit, 
       meta: { 
         bitgetSpotUsdtEur: parseFloat(bitgetSetting?.value || '0'),
-        mexcSpotUsdtMxn: parseFloat(mexcSetting?.value || '0')
+        binanceSpotUsdtMxn: parseFloat(binanceMxnSetting?.value || '0')
       } 
     };
   }

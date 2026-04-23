@@ -37,7 +37,7 @@ export const QUEUE_NAMES = {
   BIGQUERY_SYNC: 'bigquery-sync',
   FRAUD_SCAN: 'fraud-scan',
   BITGET_SPOT_SYNC: 'bitget-spot-sync',
-  MEXC_SPOT_SYNC: 'mexc-spot-sync',
+  BINANCE_SPOT_MXN_SYNC: 'binance-spot-mxn-sync',
   CAPITAL_FLOW_SYNC: 'capital-flow-sync',
 } as const;
 
@@ -134,7 +134,7 @@ export async function registerRepeatableJobs(): Promise<void> {
     { queue: QUEUE_NAMES.BIGQUERY_SYNC,   every: 21600000, name: 'bq-sync-tick' },
     { queue: QUEUE_NAMES.FRAUD_SCAN,      every: 21600000, name: 'fraud-scan-tick' },
     { queue: QUEUE_NAMES.BITGET_SPOT_SYNC, every: 600000, name: 'bitget-spot-tick' },
-    { queue: QUEUE_NAMES.MEXC_SPOT_SYNC,   every: 300000, name: 'mexc-spot-tick' },
+    { queue: QUEUE_NAMES.BINANCE_SPOT_MXN_SYNC,   every: 300000, name: 'binance-spot-mxn-tick' },
     { queue: QUEUE_NAMES.CAPITAL_FLOW_SYNC, every: 30000, name: 'capital-flow-sync-tick' },
   ];
 
