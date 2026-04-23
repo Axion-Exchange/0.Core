@@ -449,28 +449,53 @@ export class KycOrchestratorService {
 
       if (userId && !matchedUserIds.has(userId)) {
         matchedUserIds.add(userId);
-        const kycStatus = this.mapStatus(sess.status);
 
-        // Update session with match
+        let finalStatus = sess.status;
+        let email: string | undefined;
+        try {
+          const { diditService } = require('./didit.service.js');
+          const fullDecision = await diditService.getSessionDecision(sess.externalId);
+          if (fullDecision && fullDecision.status) {
+            finalStatus = fullDecision.status;
+          }
+          const raw = fullDecision.raw || fullDecision;
+          if (raw.email_address) {
+            email = typeof raw.email_address === 'string' ? raw.email_address : raw.email_address.email;
+          }
+          if (!email) {
+             const str = JSON.stringify(raw);
+             const match = str.match(/"email"\s*:\s*"([^"]+)"/);
+             if (match) email = match[1];
+          }
+        } catch (e) {
+          console.warn('[Orchestrator] Failed to fetch full decision for email:', e);
+        }
+
+        const kycStatus = this.mapStatus(finalStatus);
+
+        // Update session with match and corrected status
         await prisma.kycSession.update({
           where: { id: sess.id },
-          data: { matchedUserId: userId, matchSimilarity: similarity },
+          data: { matchedUserId: userId, matchSimilarity: similarity, status: finalStatus },
         });
 
-        // Update user kycStatus
+        // Update user kycStatus and email
+        const updateData: any = {
+          kycStatus,
+          country: sess.country || undefined,
+          metadata: {
+            kycProvider: sess.provider.provider,
+            kycAppName: sess.provider.name,
+            kycSessionId: sess.externalId,
+            kycMatchSimilarity: similarity,
+            kycMatchedAt: new Date().toISOString(),
+          },
+        };
+        if (email) updateData.email = email;
+
         await prisma.user.update({
           where: { id: userId },
-          data: {
-            kycStatus,
-            country: sess.country || undefined,
-            metadata: {
-              kycProvider: sess.provider.provider,
-              kycAppName: sess.provider.name,
-              kycSessionId: sess.externalId,
-              kycMatchSimilarity: similarity,
-              kycMatchedAt: new Date().toISOString(),
-            },
-          },
+          data: updateData,
         });
 
         matched++;
@@ -509,22 +534,41 @@ export class KycOrchestratorService {
 
     for (const sess of matched) {
       if (!sess.matchedUser) continue;
-      const newStatus = this.mapStatus(sess.status);
+      let sessionStatus = sess.status;
+      if (sess.rawPayload && typeof sess.rawPayload === 'object' && (sess.rawPayload as any).status) {
+        sessionStatus = (sess.rawPayload as any).status;
+      }
+      
+      const newStatus = this.mapStatus(sessionStatus);
       const currentStatus = sess.matchedUser.kycStatus;
 
       // Only propagate if status actually changed
       if (newStatus !== currentStatus) {
-        await prisma.user.update({
-          where: { id: sess.matchedUser.id },
-          data: { kycStatus: newStatus },
-        });
-        updated++;
-        changes.push({
-          user: sess.matchedUser.legalName || sess.matchedUser.id,
-          from: currentStatus,
-          to: newStatus,
-        });
-        log.info(`[Orchestrator] Status change: ${sess.matchedUser.legalName} ${currentStatus} → ${newStatus}`);
+        // Double check using the decision endpoint if going from APPROVED back to PENDING/IN_REVIEW
+        let finalStatus = newStatus;
+        if (currentStatus === 'APPROVED' && (newStatus === 'PENDING' || newStatus === 'IN_REVIEW')) {
+            try {
+              const { diditService } = require('./didit.service.js');
+              const decision = await diditService.getSessionDecision(sess.externalId);
+              if (decision && decision.status) {
+                 finalStatus = this.mapStatus(decision.status);
+              }
+            } catch (e) {}
+        }
+        
+        if (finalStatus !== currentStatus) {
+          await prisma.user.update({
+            where: { id: sess.matchedUser.id },
+            data: { kycStatus: finalStatus },
+          });
+          updated++;
+          changes.push({
+            user: sess.matchedUser.legalName || sess.matchedUser.id,
+            from: currentStatus,
+            to: finalStatus,
+          });
+          log.info(`[Orchestrator] Status change: ${sess.matchedUser.legalName} ${currentStatus} → ${finalStatus}`);
+        }
       }
     }
 
