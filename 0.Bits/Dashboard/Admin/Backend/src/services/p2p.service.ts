@@ -42,7 +42,7 @@ export class P2PService {
       await prisma.p2PAccount.create({
         data: {
           exchange: 'BINANCE',
-          label: 'Default Binance (ENV)',
+          label: 'Binance Marwan Yousif',
           apiKeyEnc: encrypt(config.BINANCE_API_KEY!),
           apiSecretEnc: encrypt(apiSecret),
           region: 'Global',

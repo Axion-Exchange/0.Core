@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { p2pService } from '../services/p2p.service.js';
 import { validateBody, validateParams } from '../middleware/validate.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { auditLog } from '../middleware/audit.js';
 import { idParamSchema, param } from '../validators/common.schema.js';
 import { createAdSchema, updateAdSchema, toggleAdSchema, createAccountSchema, createDisputeSchema, resolveDisputeSchema, createPaymentMethodSchema } from '../validators/p2p.schema.js';
@@ -10,18 +10,20 @@ import { buildPaginationMeta } from '../lib/pagination.js';
 
 const router = Router();
 
-// All P2P routes require authentication
-router.use(requireAuth);
+// All P2P routes require authentication (except GET /accounts for now)
 router.use(auditLog);
 
 // ── Accounts ─────────────────────────────────────────
 
-router.get('/accounts', async (_req, res, next) => {
+router.get('/accounts', optionalAuth, async (_req, res, next) => {
   try {
     const accounts = await p2pService.listAccounts();
     sendSuccess(res, accounts);
   } catch (err) { next(err); }
 });
+
+// All other P2P routes require strict authentication
+router.use(requireAuth);
 
 router.post('/accounts', validateBody(createAccountSchema), async (req, res, next) => {
   try {
