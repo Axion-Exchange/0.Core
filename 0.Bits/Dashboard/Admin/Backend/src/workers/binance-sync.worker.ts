@@ -160,7 +160,7 @@ class BinanceSyncWorker {
              userNodeId = userNode.id;
           }
         } catch (upsertError: any) {
-          logger.debug(`[BinanceSyncWorker] Concurrency skip on User Upsert for ${counterpartyNickname}: ${upsertError.message}`);
+          log.debug(`[BinanceSyncWorker] Concurrency skip on User Upsert for ${counterpartyNickname}: ${upsertError.message}`);
         }
 
         // Upsert into Database (ExternalOrderId enforces uniqueness)
