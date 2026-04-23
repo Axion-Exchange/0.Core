@@ -140,6 +140,26 @@ export class CapitalFlowSyncWorker {
             }
           }
 
+          // 5. Account Balances Snapshot (Funding Wallet)
+          try {
+            const fundingBalances = await binanceService.fetchFundingBalances(account);
+            for (const b of fundingBalances) {
+              await prisma.balanceLedger.create({
+                data: {
+                  accountId: account.id,
+                  source: 'binance_funding',
+                  currency: b.currency,
+                  balance: b.available,
+                  pending: b.locked,
+                  metadata: { provider: 'binance', accountLabel: account.label }
+                }
+              });
+            }
+            log.info(`[CapitalFlowWorker] Snapshotted ${fundingBalances.length} balances for ${account.label}`);
+          } catch(err: any) {
+            log.error(`[CapitalFlowWorker] Failed to snapshot balances for ${account.label}: ${err.message}`);
+          }
+
         } catch (err: any) {
           log.error(`[CapitalFlowWorker] Failed to sync account ${account.label}: ${err.message}`);
         }
