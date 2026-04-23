@@ -1,5 +1,6 @@
 import * as ccxt from 'ccxt';
 import { createLogger } from '../../lib/logger.js';
+import * as crypto from 'crypto';
 
 const log = createLogger('binance-p2p-connector');
 
@@ -31,7 +32,31 @@ export class BinanceP2PConnector {
   }
 
   async listAdsWithPagination(params: Record<string, any> = {}) {
-    return this.client.request('c2c/ads/listWithPagination', 'sapi', 'POST', params);
+    const timestamp = Date.now();
+    const queryPayload = `timestamp=${timestamp}`;
+    let signature: string;
+    
+    // Binance requires SAPI listWithPagination to be a JSON body, but the signature must ONLY cover the query string.
+    // CCXT natively tries to form-encode the body and sign it, which returns -1000. We bypass it here.
+    if (this.client.secret && (this.client.secret.includes('BEGIN PRIVATE KEY') || this.client.secret.includes('BEGIN RSA PRIVATE KEY'))) {
+      const signer = crypto.createSign('RSA-SHA256');
+      signer.update(queryPayload);
+      signer.end();
+      signature = encodeURIComponent(signer.sign(this.client.secret, 'base64'));
+    } else {
+      signature = crypto.createHmac('sha256', this.client.secret).update(queryPayload).digest('hex');
+    }
+
+    const rawRes = await fetch(`https://api.binance.com/sapi/v1/c2c/ads/listWithPagination?${queryPayload}&signature=${signature}`, {
+        method: 'POST',
+        headers: {
+          'X-MBX-APIKEY': this.client.apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(params)
+    });
+    
+    return rawRes.json();
   }
 
   async postAd(params: Record<string, any>) {
