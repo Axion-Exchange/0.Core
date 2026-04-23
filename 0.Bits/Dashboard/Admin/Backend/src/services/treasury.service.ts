@@ -326,7 +326,7 @@ export class TreasuryService {
       if (!assets.has(asset)) assets.set(asset, { available: 0, pendingBuys: 0 });
       assets.get(asset)!.pendingBuys += Number(order.amount);
       
-      const acc = activeAccounts.find(a => a.id === order.accountId);
+      const acc = activeAccounts.find((a: any) => a.id === order.accountId);
       const accLabel = acc?.label || 'Default';
       const key = `${accLabel}-${asset}`;
       if (!accountDetailsMap.has(key)) accountDetailsMap.set(key, { accountLabel: accLabel, asset: asset, available: 0, pendingBuys: 0 });
