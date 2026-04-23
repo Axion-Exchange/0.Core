@@ -8,8 +8,10 @@ export class TreasuryService {
   /**
    * Get aggregated portfolio across all currencies.
    */
-  async getPortfolioSummary() {
+  async getPortfolioSummary(accountId?: string) {
+    const where = accountId ? { accountId } : {};
     const portfolios = await prisma.portfolio.findMany({
+      where,
       orderBy: { currency: 'asc' },
     });
 
@@ -38,8 +40,10 @@ export class TreasuryService {
   /**
    * Get live exchange balances across all wallets.
    */
-  async getBalances() {
+  async getBalances(accountId?: string) {
+    const where = accountId ? { accountId } : {};
     const wallets = await prisma.cryptoWallet.findMany({
+      where,
       include: { account: { select: { exchange: true, label: true } } },
       orderBy: [{ account: { exchange: 'asc' } }, { asset: 'asc' }],
     });
@@ -54,15 +58,19 @@ export class TreasuryService {
   /**
    * Historical balance snapshots for chart data.
    */
-  async getBalanceHistory(currency: string, days: number = 30) {
+  async getBalanceHistory(currency: string, days: number = 30, accountId?: string) {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const portfolio = await prisma.portfolio.findUnique({ where: { currency } });
-    if (!portfolio) return [];
+    const where: any = { currency };
+    if (accountId) where.accountId = accountId;
+
+    const portfolios = await prisma.portfolio.findMany({ where });
+    if (portfolios.length === 0) return [];
+    const portfolioIds = portfolios.map(p => p.id);
 
     return prisma.balanceSnapshot.findMany({
       where: {
-        portfolioId: portfolio.id,
+        portfolioId: { in: portfolioIds },
         createdAt: { gte: since },
       },
       orderBy: { createdAt: 'asc' },
@@ -81,9 +89,11 @@ export class TreasuryService {
     to?: Date;
     page: number;
     limit: number;
+    accountId?: string;
   }) {
     const where: Prisma.TransactionWhereInput = {};
 
+    if (filters.accountId) where.accountId = filters.accountId;
     if (filters.type) where.type = filters.type;
     if (filters.status) where.status = filters.status;
     if (filters.asset) where.asset = filters.asset;
@@ -164,9 +174,9 @@ export class TreasuryService {
    * Institutional Aggregated Balances — Uses balance_ledger for correct
    * available + pending totals, and real historical snapshots for charts.
    */
-  async getAggregatedPortfolioView() {
+  async getAggregatedPortfolioView(accountId?: string) {
     // 1. Get latest balance per source+currency from balance_ledger
-    const latestBalances: any[] = await prisma.$queryRawUnsafe(`
+    let query = `
       SELECT DISTINCT ON (source, currency)
         source, currency, 
         available::float as available,
@@ -174,8 +184,13 @@ export class TreasuryService {
         (available + pending)::float as total,
         "snapshotAt"
       FROM balance_ledger
-      ORDER BY source, currency, "snapshotAt" DESC
-    `);
+    `;
+    if (accountId) {
+      query += ` WHERE "accountId" = '${accountId}'`;
+    }
+    query += ` ORDER BY source, currency, "snapshotAt" DESC`;
+
+    const latestBalances: any[] = await prisma.$queryRawUnsafe(query);
 
     // 2. Build summary buckets from real data
     const summaryBuckets = latestBalances.map((b: any) => {

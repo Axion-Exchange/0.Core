@@ -6,7 +6,7 @@
 // ============================================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
@@ -136,26 +136,26 @@ enum PaymentMethodType {
 
 /// Admin dashboard operators. These are the internal team members.
 model Admin {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email         String    @unique
-  passwordHash  String
-  displayName   String
-  role          Role      @default(ANALYST)
-  avatarUrl     String?
-  mfaEnabled    Boolean   @default(false)
-  mfaSecret     String?
-  lastLoginAt   DateTime?
-  lastLoginIp   String?
-  failedLogins  Int       @default(0)
-  lockedUntil   DateTime?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  displayName  String
+  role         Role      @default(ANALYST)
+  avatarUrl    String?
+  mfaEnabled   Boolean   @default(false)
+  mfaSecret    String?
+  lastLoginAt  DateTime?
+  lastLoginIp  String?
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  sessions      Session[]
-  auditLogs     AuditLog[]
-  notifications Notification[]
-  assignedDisputes P2PDispute[] @relation("DisputeAssignee")
+  sessions          Session[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  assignedDisputes  P2PDispute[]   @relation("DisputeAssignee")
   reviewedDocuments UserDocument[] @relation("DocumentReviewer")
 
   @@index([email])
@@ -164,16 +164,16 @@ model Admin {
 
 /// JWT session tracking for token revocation and audit.
 model Session {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  adminId     String    @db.Uuid
-  tokenHash   String    @unique
-  ipAddress   String
-  userAgent   String?
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdAt   DateTime  @default(now())
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId   String    @db.Uuid
+  tokenHash String    @unique
+  ipAddress String
+  userAgent String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
-  admin       Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId])
   @@index([tokenHash])
@@ -182,33 +182,33 @@ model Session {
 
 /// End-users, counterparties, and clients of the exchange.
 model User {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  externalId      String?   @unique  // Binance UID, etc.
-  email           String?   @unique
-  phone           String?
-  displayName     String
-  legalName       String?
-  country         String?   @db.VarChar(3) // ISO 3166-1 alpha-3
-  kycStatus       KYCStatus @default(NOT_STARTED)
-  kybStatus       KYBStatus @default(NOT_STARTED)
-  riskScore       Int       @default(0) // 0-100
-  isFrozen        Boolean   @default(false)
-  isBlocked       Boolean   @default(false)
-  blockedReason   String?
-  totalVolume     Decimal   @default(0) @db.Decimal(24, 8)
-  totalTrades     Int       @default(0)
-  notes           String?
-  metadata        Json?     // Flexible key-value store
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  externalId    String?   @unique // Binance UID, etc.
+  email         String?   @unique
+  phone         String?
+  displayName   String
+  legalName     String?
+  country       String?   @db.VarChar(3) // ISO 3166-1 alpha-3
+  kycStatus     KYCStatus @default(NOT_STARTED)
+  kybStatus     KYBStatus @default(NOT_STARTED)
+  riskScore     Int       @default(0) // 0-100
+  isFrozen      Boolean   @default(false)
+  isBlocked     Boolean   @default(false)
+  blockedReason String?
+  totalVolume   Decimal   @default(0) @db.Decimal(24, 8)
+  totalTrades   Int       @default(0)
+  notes         String?
+  metadata      Json? // Flexible key-value store
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  documents       UserDocument[]
-  orders          P2POrder[]     @relation("OrderUser")
-  ordersAsPayer   P2POrder[]     @relation("ActualPayer") // Orders where this user was the actual bank payer
-  disputes        P2PDispute[]   @relation("DisputeUser")
-  transactions    Transaction[]
-  fiatLedgers     FiatLedger[]
-  kycSessions     KycSession[]
+  documents     UserDocument[]
+  orders        P2POrder[]     @relation("OrderUser")
+  ordersAsPayer P2POrder[]     @relation("ActualPayer") // Orders where this user was the actual bank payer
+  disputes      P2PDispute[]   @relation("DisputeUser")
+  transactions  Transaction[]
+  fiatLedgers   FiatLedger[]
+  kycSessions   KycSession[]
 
   @@index([email])
   @@index([externalId])
@@ -221,7 +221,7 @@ model User {
 model UserDocument {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId             String    @db.Uuid
-  documentType       String    // passport, drivers_license, utility_bill, incorporation_cert, etc.
+  documentType       String // passport, drivers_license, utility_bill, incorporation_cert, etc.
   fileUrl            String
   fileName           String?
   fileSizeBytes      Int?
@@ -234,8 +234,8 @@ model UserDocument {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviewedBy         Admin?    @relation("DocumentReviewer", fields: [reviewedById], references: [id])
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy Admin? @relation("DocumentReviewer", fields: [reviewedById], references: [id])
 
   @@index([userId])
   @@index([verificationStatus])
@@ -249,18 +249,18 @@ model UserDocument {
 /// Registered KYC provider applications (supports multiple apps per provider)
 model KycProvider {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String   // Human-readable: "Axion EUR", "Axion MXN", "Axion GBP"
-  provider      String   // Provider type: "DIDIT", "SUMSUB", "ONFIDO"
-  appId         String   // Provider-specific app/client ID
-  apiKey        String   // API key
-  webhookSecret String?  // HMAC secret for webhook signature verification
+  name          String // Human-readable: "Axion EUR", "Axion MXN", "Axion GBP"
+  provider      String // Provider type: "DIDIT", "SUMSUB", "ONFIDO"
+  appId         String // Provider-specific app/client ID
+  apiKey        String // API key
+  webhookSecret String? // HMAC secret for webhook signature verification
   baseUrl       String   @default("https://verification.didit.me/v3")
   isActive      Boolean  @default(true)
-  metadata      Json?    // Extra provider-specific config
+  metadata      Json? // Extra provider-specific config
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions      KycSession[]
+  sessions KycSession[]
 
   @@unique([provider, appId])
   @@map("kyc_providers")
@@ -270,22 +270,22 @@ model KycProvider {
 model KycSession {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   providerId      String    @db.Uuid
-  externalId      String    // Didit session_id, SumSub applicantId, etc.
-  fullName        String?   // Legal name extracted from ID document
-  normalizedName  String?   // Token-sorted uppercase for fuzzy matching
+  externalId      String // Didit session_id, SumSub applicantId, etc.
+  fullName        String? // Legal name extracted from ID document
+  normalizedName  String? // Token-sorted uppercase for fuzzy matching
   country         String?   @db.VarChar(3) // ISO 3166-1 alpha-3
   documentType    String?
-  status          String    // APPROVED, DECLINED, IN_REVIEW, EXPIRED, ABANDONED
+  status          String // APPROVED, DECLINED, IN_REVIEW, EXPIRED, ABANDONED
   portraitUrl     String?
   matchedUserId   String?   @db.Uuid
   matchSimilarity Float?
-  rawPayload      Json?     // Full API response archived for audit
+  rawPayload      Json? // Full API response archived for audit
   verifiedAt      DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  provider        KycProvider @relation(fields: [providerId], references: [id])
-  matchedUser     User?       @relation(fields: [matchedUserId], references: [id])
+  provider    KycProvider @relation(fields: [providerId], references: [id])
+  matchedUser User?       @relation(fields: [matchedUserId], references: [id])
 
   @@unique([providerId, externalId])
   @@index([normalizedName])
@@ -306,23 +306,27 @@ enum ExchangeId {
 
 /// Merchant exchange accounts (Binance, Bitget, etc.)
 model P2PAccount {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  exchange      ExchangeId
-  label         String    // "Binance EUR Main", etc.
-  apiKeyEnc     String    // AES-256-GCM encrypted
-  apiSecretEnc  String    // AES-256-GCM encrypted
-  passphraseEnc String?   // For exchanges requiring passphrase
-  region        String?   @db.VarChar(10) // EU, LATAM, APAC, etc.
-  isActive      Boolean   @default(true)
-  lastSyncAt    DateTime?
-  metadata      Json?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  exchange            ExchangeId
+  label               String // "Binance EUR Main", etc.
+  apiKeyEnc           String // AES-256-GCM encrypted
+  apiSecretEnc        String // AES-256-GCM encrypted
+  passphraseEnc       String? // For exchanges requiring passphrase
+  region              String?    @db.VarChar(10) // EU, LATAM, APAC, etc.
+  isActive            Boolean    @default(true)
+  lastSyncAt          DateTime?
+  metadata            Json?
+  fiatIntegrationData Json? // { "januar": "123", "facilitapay": "456" }
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   advertisements P2PAdvertisement[]
   wallets        CryptoWallet[]
   orders         P2POrder[]
   transactions   Transaction[]
+  portfolios     Portfolio[]
+  balanceLedgers BalanceLedger[]
+  pnlSnapshots   PnlSnapshot[]
 
   @@unique([exchange, label])
   @@map("p2p_accounts")
@@ -330,26 +334,26 @@ model P2PAccount {
 
 /// P2P advertisements (market maker spread offerings).
 model P2PAdvertisement {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId     String    @db.Uuid
-  externalAdId  String?   @unique  // Exchange-side ad ID
-  asset         String    @db.VarChar(10) // USDT, BTC, ETH, etc.
-  fiat          String    @db.VarChar(10) // EUR, BRL, COP, MXN, NGN
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId     String   @db.Uuid
+  externalAdId  String?  @unique // Exchange-side ad ID
+  asset         String   @db.VarChar(10) // USDT, BTC, ETH, etc.
+  fiat          String   @db.VarChar(10) // EUR, BRL, COP, MXN, NGN
   type          AdType
-  price         Decimal   @db.Decimal(24, 8)
-  marginPercent Decimal   @db.Decimal(8, 4)
-  minLimit      Decimal   @db.Decimal(24, 2)
-  maxLimit      Decimal   @db.Decimal(24, 2)
-  availableQty  Decimal   @default(0) @db.Decimal(24, 8)
-  status        AdStatus  @default(ACTIVE)
+  price         Decimal  @db.Decimal(24, 8)
+  marginPercent Decimal  @db.Decimal(8, 4)
+  minLimit      Decimal  @db.Decimal(24, 2)
+  maxLimit      Decimal  @db.Decimal(24, 2)
+  availableQty  Decimal  @default(0) @db.Decimal(24, 8)
+  status        AdStatus @default(ACTIVE)
   autoReply     String?
   remarks       String?
   metadata      Json?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  account       P2PAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  orders        P2POrder[]
+  account P2PAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  orders  P2POrder[]
 
   @@index([accountId])
   @@index([asset, fiat])
@@ -369,29 +373,29 @@ model P2POrder {
   fiatAmount       Decimal     @db.Decimal(24, 2)
   price            Decimal     @db.Decimal(24, 8) // Execution price
   fee              Decimal     @default(0) @db.Decimal(24, 8)
-  type             AdType      // BUY or SELL from merchant perspective
-  counterparty     String?     // Counterparty nickname
-  counterpartyName String?     // True Legal Name extracted via undocumented SAPI
+  type             AdType // BUY or SELL from merchant perspective
+  counterparty     String? // Counterparty nickname
+  counterpartyName String? // True Legal Name extracted via undocumented SAPI
   status           OrderStatus @default(PENDING_FIAT)
-  paymentMethod    String?     // bank_transfer, pix, etc.
-  paymentRef       String?     // Bank reference number
+  paymentMethod    String? // bank_transfer, pix, etc.
+  paymentRef       String? // Bank reference number
   releaseDeadline  DateTime?
   completedAt      DateTime?
   cancelledAt      DateTime?
   cancelReason     String?
   metadata         Json?
-  actualPayerId    String?     @db.Uuid  // Third-party: who actually paid via bank
+  actualPayerId    String?     @db.Uuid // Third-party: who actually paid via bank
   isThirdParty     Boolean     @default(false)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  accountId        String?           @db.Uuid
-  account          P2PAccount?       @relation(fields: [accountId], references: [id])
-  advertisement    P2PAdvertisement? @relation(fields: [advertisementId], references: [id])
-  user             User?             @relation("OrderUser", fields: [userId], references: [id])
-  actualPayer      User?             @relation("ActualPayer", fields: [actualPayerId], references: [id])
-  disputes         P2PDispute[]
-  chatMessages     P2PChatMessage[]
+  accountId     String?           @db.Uuid
+  account       P2PAccount?       @relation(fields: [accountId], references: [id])
+  advertisement P2PAdvertisement? @relation(fields: [advertisementId], references: [id])
+  user          User?             @relation("OrderUser", fields: [userId], references: [id])
+  actualPayer   User?             @relation("ActualPayer", fields: [actualPayerId], references: [id])
+  disputes      P2PDispute[]
+  chatMessages  P2PChatMessage[]
 
   @@index([advertisementId])
   @@index([userId])
@@ -403,17 +407,17 @@ model P2POrder {
 
 /// Persistent, background-synced Binance chat communications natively indexed locally.
 model P2PChatMessage {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId         String   @db.Uuid
-  externalMsgId   String   @unique // Message ID from Binance to avoid duplicates
-  sender          String?  // system | buyer | seller 
-  content         String   @db.Text
-  hasImage        Boolean  @default(false)
-  imageUrl        String?
-  timestamp       DateTime
-  createdAt       DateTime @default(now())
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String   @db.Uuid
+  externalMsgId String   @unique // Message ID from Binance to avoid duplicates
+  sender        String? // system | buyer | seller 
+  content       String   @db.Text
+  hasImage      Boolean  @default(false)
+  imageUrl      String?
+  timestamp     DateTime
+  createdAt     DateTime @default(now())
 
-  order           P2POrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order P2POrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, timestamp])
   @@map("p2p_chat_messages")
@@ -424,13 +428,13 @@ model P2PDispute {
   id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderId         String        @db.Uuid
   userId          String?       @db.Uuid
-  filedBy         String        // counterparty name or admin
+  filedBy         String // counterparty name or admin
   reason          String
   description     String?
-  evidenceUrls    String[]      // Array of evidence file URLs
+  evidenceUrls    String[] // Array of evidence file URLs
   status          DisputeStatus @default(OPEN)
   resolution      String?
-  resolvedInFavor String?       // "buyer" | "seller"
+  resolvedInFavor String? // "buyer" | "seller"
   assignedToId    String?       @db.Uuid
   escalatedAt     DateTime?
   resolvedAt      DateTime?
@@ -438,9 +442,9 @@ model P2PDispute {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  order           P2POrder      @relation(fields: [orderId], references: [id])
-  user            User?         @relation("DisputeUser", fields: [userId], references: [id])
-  assignedTo      Admin?        @relation("DisputeAssignee", fields: [assignedToId], references: [id])
+  order      P2POrder @relation(fields: [orderId], references: [id])
+  user       User?    @relation("DisputeUser", fields: [userId], references: [id])
+  assignedTo Admin?   @relation("DisputeAssignee", fields: [assignedToId], references: [id])
 
   @@index([orderId])
   @@index([status])
@@ -449,24 +453,24 @@ model P2PDispute {
 
 /// Fiat payment methods (bank accounts, mobile money, etc.)
 model PaymentMethod {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label           String            // "Revolut EUR", "Wise GBP", etc.
-  type            PaymentMethodType @default(BANK_TRANSFER)
-  bankName        String?
-  accountName     String?
-  accountNumber   String?           // Encrypted at application layer
-  routingNumber   String?
-  swiftCode       String?
-  currency        String            @db.VarChar(3)
-  country         String?           @db.VarChar(3)
-  region          String?           @db.VarChar(10)
-  isActive        Boolean           @default(true)
-  isPrimary       Boolean           @default(false)
-  dailyLimit      Decimal?          @db.Decimal(24, 2)
-  monthlyLimit    Decimal?          @db.Decimal(24, 2)
-  metadata        Json?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label         String // "Revolut EUR", "Wise GBP", etc.
+  type          PaymentMethodType @default(BANK_TRANSFER)
+  bankName      String?
+  accountName   String?
+  accountNumber String? // Encrypted at application layer
+  routingNumber String?
+  swiftCode     String?
+  currency      String            @db.VarChar(3)
+  country       String?           @db.VarChar(3)
+  region        String?           @db.VarChar(10)
+  isActive      Boolean           @default(true)
+  isPrimary     Boolean           @default(false)
+  dailyLimit    Decimal?          @db.Decimal(24, 2)
+  monthlyLimit  Decimal?          @db.Decimal(24, 2)
+  metadata      Json?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@index([currency])
   @@index([isActive])
@@ -480,7 +484,7 @@ model PaymentMethod {
 /// Aggregated portfolio NAV per currency.
 model Portfolio {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  currency         String    @unique @db.VarChar(10) // EUR, USD, BRL, COP, MXN, USDT, BTC
+  currency         String    @db.VarChar(10) // EUR, USD, BRL, COP, MXN, USDT, BTC
   totalBalance     Decimal   @default(0) @db.Decimal(24, 8)
   availableBalance Decimal   @default(0) @db.Decimal(24, 8)
   lockedBalance    Decimal   @default(0) @db.Decimal(24, 8)
@@ -488,8 +492,13 @@ model Portfolio {
   lastSyncAt       DateTime?
   updatedAt        DateTime  @updatedAt
 
-  snapshots        BalanceSnapshot[]
+  accountId String?     @db.Uuid
+  account   P2PAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
+  snapshots BalanceSnapshot[]
+
+  @@unique([accountId, currency])
+  @@index([accountId])
   @@map("portfolios")
 }
 
@@ -500,12 +509,12 @@ model FiatLedger {
   currency       String    @db.VarChar(3)
   balance        Decimal   @db.Decimal(24, 8)
   lockedInEscrow Decimal   @default(0) @db.Decimal(24, 8)
-  source         String?   // "januar", "facilitapay", etc.
+  source         String? // "januar", "facilitapay", etc.
   lastSyncAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  owner          User?     @relation(fields: [userId], references: [id])
+  owner User? @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([currency])
@@ -524,7 +533,7 @@ model CryptoWallet {
   lastSyncAt     DateTime?
   updatedAt      DateTime  @updatedAt
 
-  account        P2PAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account P2PAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, asset])
   @@index([accountId])
@@ -533,14 +542,14 @@ model CryptoWallet {
 
 /// Historical balance time-series for portfolio charts.
 model BalanceSnapshot {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  portfolioId String    @db.Uuid
-  balance     Decimal   @db.Decimal(24, 8)
-  balanceUsd  Decimal?  @db.Decimal(24, 2) // Normalized USD value at snapshot time
-  source      String?   // What triggered the snapshot
-  createdAt   DateTime  @default(now())
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  portfolioId String   @db.Uuid
+  balance     Decimal  @db.Decimal(24, 8)
+  balanceUsd  Decimal? @db.Decimal(24, 2) // Normalized USD value at snapshot time
+  source      String? // What triggered the snapshot
+  createdAt   DateTime @default(now())
 
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
 
   @@index([portfolioId, createdAt])
   @@map("balance_snapshots")
@@ -551,41 +560,45 @@ model BalanceSnapshot {
 /// Query: "What was our Januar balance at 1:25 PM on Jan 15?"
 model BalanceLedger {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  source     String   // "januar", "facilitapay", "binance_escrow"
+  source     String // "januar", "facilitapay", "binance_escrow"
   currency   String   @db.VarChar(10) // EUR, COP, MXN
   available  Decimal  @db.Decimal(24, 8) // Live bank balance at snapshot time
   pending    Decimal  @default(0) @db.Decimal(24, 8) // Escrowed P2P amount at snapshot time
-  metadata   Json?    // Raw API response for audit
+  metadata   Json? // Raw API response for audit
   snapshotAt DateTime @default(now()) // When this snapshot was taken
 
+  accountId String?     @db.Uuid
+  account   P2PAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
   @@index([source, currency, snapshotAt])
+  @@index([accountId])
   @@map("balance_ledger")
 }
 
 /// Unified transaction ledger (buy/sell/transfer/conversion).
 model Transaction {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  externalId      String?           @unique // Exchange or bank reference
-  userId          String?           @db.Uuid
-  type            TransactionType
-  asset           String            @db.VarChar(10)
-  amount          Decimal           @db.Decimal(24, 8)
-  fiat            String?           @db.VarChar(10)
-  fiatAmount      Decimal?          @db.Decimal(24, 2)
-  rate            Decimal?          @db.Decimal(24, 8)
-  fee             Decimal           @default(0) @db.Decimal(24, 8)
-  feeCurrency     String?           @db.VarChar(10)
-  status          TransactionStatus @default(PENDING)
-  source          String?           // "binance_p2p", "januar", "facilitapay", "manual"
-  description     String?
-  metadata        Json?
-  completedAt     DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  externalId  String?           @unique // Exchange or bank reference
+  userId      String?           @db.Uuid
+  type        TransactionType
+  asset       String            @db.VarChar(10)
+  amount      Decimal           @db.Decimal(24, 8)
+  fiat        String?           @db.VarChar(10)
+  fiatAmount  Decimal?          @db.Decimal(24, 2)
+  rate        Decimal?          @db.Decimal(24, 8)
+  fee         Decimal           @default(0) @db.Decimal(24, 8)
+  feeCurrency String?           @db.VarChar(10)
+  status      TransactionStatus @default(PENDING)
+  source      String? // "binance_p2p", "januar", "facilitapay", "manual"
+  description String?
+  metadata    Json?
+  completedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
-  user            User?             @relation(fields: [userId], references: [id])
-  accountId       String?           @db.Uuid
-  account         P2PAccount?       @relation(fields: [accountId], references: [id])
+  user      User?       @relation(fields: [userId], references: [id])
+  accountId String?     @db.Uuid
+  account   P2PAccount? @relation(fields: [accountId], references: [id])
 
   @@index([userId])
   @@index([type])
@@ -605,7 +618,7 @@ model ApiKey {
   label       String
   keyPrefix   String    @db.VarChar(8) // First 8 chars for identification
   keyHash     String    @unique // SHA-256 hash of the full key
-  permissions String[]  // ["read:orders", "write:ads", etc.]
+  permissions String[] // ["read:orders", "write:ads", etc.]
   lastUsedAt  DateTime?
   lastUsedIp  String?
   expiresAt   DateTime?
@@ -625,10 +638,10 @@ model Node {
   hostname        String     @unique
   ipAddress       String
   region          String?    @db.VarChar(20)
-  provider        String?    // "hetzner", "aws", "digitalocean"
-  role            String?    // "api", "worker", "db", "proxy"
+  provider        String? // "hetzner", "aws", "digitalocean"
+  role            String? // "api", "worker", "db", "proxy"
   status          NodeStatus @default(ONLINE)
-  version         String?    // Software version running
+  version         String? // Software version running
   cpuPercent      Decimal?   @db.Decimal(5, 2)
   memoryPercent   Decimal?   @db.Decimal(5, 2)
   diskPercent     Decimal?   @db.Decimal(5, 2)
@@ -646,7 +659,7 @@ model Node {
 model SystemLog {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   level         LogLevel
-  source        String   // "auth", "p2p", "treasury", "exchange", "system"
+  source        String // "auth", "p2p", "treasury", "exchange", "system"
   message       String
   metadata      Json?
   correlationId String?  @db.Uuid
@@ -663,13 +676,13 @@ model SystemLog {
 
 /// Periodic service health check results.
 model HealthCheck {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  service    String   // "database", "binance_api", "januar_api", "redis"
-  status     String   // "healthy", "degraded", "down"
-  latencyMs  Int?
-  message    String?
-  metadata   Json?
-  checkedAt  DateTime @default(now())
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service   String // "database", "binance_api", "januar_api", "redis"
+  status    String // "healthy", "degraded", "down"
+  latencyMs Int?
+  message   String?
+  metadata  Json?
+  checkedAt DateTime @default(now())
 
   @@index([service, checkedAt])
   @@map("health_checks")
@@ -683,20 +696,20 @@ model HealthCheck {
 model AuditLog {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   adminId       String   @db.Uuid
-  action        String   // "user.freeze", "order.release", "ad.create", etc.
-  resource      String   // "user", "order", "advertisement", etc.
-  resourceId    String?  // ID of the affected resource
+  action        String // "user.freeze", "order.release", "ad.create", etc.
+  resource      String // "user", "order", "advertisement", etc.
+  resourceId    String? // ID of the affected resource
   method        String   @db.VarChar(10) // HTTP method
-  path          String   // Request path
+  path          String // Request path
   ipAddress     String
   userAgent     String?
-  requestBody   Json?    // Sanitized request payload
-  responseCode  Int?     // HTTP response status
-  duration      Int?     // Request duration in ms
+  requestBody   Json? // Sanitized request payload
+  responseCode  Int? // HTTP response status
+  duration      Int? // Request duration in ms
   correlationId String?  @db.Uuid
   createdAt     DateTime @default(now())
 
-  admin         Admin    @relation(fields: [adminId], references: [id])
+  admin Admin @relation(fields: [adminId], references: [id])
 
   @@index([adminId])
   @@index([action])
@@ -716,13 +729,13 @@ model Notification {
   type      NotificationType @default(SYSTEM)
   title     String
   body      String
-  actionUrl String?          // Deep link into dashboard
+  actionUrl String? // Deep link into dashboard
   isRead    Boolean          @default(false)
   readAt    DateTime?
   metadata  Json?
   createdAt DateTime         @default(now())
 
-  admin     Admin            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId, isRead])
   @@index([createdAt])
@@ -759,8 +772,8 @@ enum MeetingStatus {
 model TeamMember {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   adminId      String    @unique @db.Uuid
-  department   String?   // "Engineering", "Operations", "Compliance"
-  title        String?   // "Head of P2P", "Risk Analyst"
+  department   String? // "Engineering", "Operations", "Compliance"
+  title        String? // "Head of P2P", "Risk Analyst"
   timezone     String?   @db.VarChar(50)
   isOnline     Boolean   @default(false)
   lastActiveAt DateTime?
@@ -777,10 +790,10 @@ model Meeting {
   id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String
   description String?
-  organizer   String        // Admin display name or email
+  organizer   String // Admin display name or email
   organizerId String?       @db.Uuid
-  attendees   String[]      // Array of admin emails/names
-  location    String?       // "Zoom", "Google Meet", room name
+  attendees   String[] // Array of admin emails/names
+  location    String? // "Zoom", "Google Meet", room name
   meetingUrl  String?
   startsAt    DateTime
   endsAt      DateTime
@@ -800,8 +813,8 @@ model Schedule {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   adminId     String   @db.Uuid
   adminName   String
-  title       String   // "P2P Monitoring Shift", "On-Call", etc.
-  dayOfWeek   Int?     // 0=Sunday, 6=Saturday (for recurring)
+  title       String // "P2P Monitoring Shift", "On-Call", etc.
+  dayOfWeek   Int? // 0=Sunday, 6=Saturday (for recurring)
   startsAt    DateTime
   endsAt      DateTime
   isRecurring Boolean  @default(false)
@@ -827,7 +840,7 @@ model Task {
   reporterId   String?      @db.Uuid
   reporterName String?
   dueDate      DateTime?
-  tags         String[]     // ["p2p", "compliance", "urgent"]
+  tags         String[] // ["p2p", "compliance", "urgent"]
   completedAt  DateTime?
   metadata     Json?
   createdAt    DateTime     @default(now())
@@ -840,18 +853,23 @@ model Task {
 }
 
 model PnlSnapshot {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  date        DateTime @db.Date
-  currency    String   @db.VarChar(10) // EUR, COP, GBP, MXN
-  realizedPnl Decimal  @default(0) @db.Decimal(24, 8)
-  buyCount    Int      @default(0)
-  sellCount   Int      @default(0)
-  buyVolume   Decimal  @default(0) @db.Decimal(24, 8)
-  sellVolume  Decimal  @default(0) @db.Decimal(24, 8)
-  spreadPct   Decimal  @default(0) @db.Decimal(10, 4)
-  inventoryQty Decimal @default(0) @db.Decimal(24, 8)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date         DateTime @db.Date
+  currency     String   @db.VarChar(10) // EUR, COP, GBP, MXN
+  realizedPnl  Decimal  @default(0) @db.Decimal(24, 8)
+  buyCount     Int      @default(0)
+  sellCount    Int      @default(0)
+  buyVolume    Decimal  @default(0) @db.Decimal(24, 8)
+  sellVolume   Decimal  @default(0) @db.Decimal(24, 8)
+  spreadPct    Decimal  @default(0) @db.Decimal(10, 4)
+  inventoryQty Decimal  @default(0) @db.Decimal(24, 8)
 
-  @@unique([date, currency])
+  accountId String?     @db.Uuid
+  account   P2PAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([date, currency, accountId])
+  @@index([accountId])
   @@map("pnl_snapshots")
 }

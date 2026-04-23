@@ -39,11 +39,12 @@ export class P2PService {
 
   // ── Advertisements ─────────────────────────────────────
 
-  async listAds(filters?: { status?: AdStatus; asset?: string; fiat?: string; type?: string; page?: number; limit?: number }) {
+  async listAds(filters?: { accountId?: string; status?: AdStatus; asset?: string; fiat?: string; type?: string; page?: number; limit?: number }) {
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 25;
     const where: Prisma.P2PAdvertisementWhereInput = {};
 
+    if (filters?.accountId) where.accountId = filters.accountId;
     if (filters?.status) where.status = filters.status;
     if (filters?.asset) where.asset = filters.asset;
     if (filters?.fiat) where.fiat = filters.fiat;
@@ -117,11 +118,12 @@ export class P2PService {
 
   // ── Orders ─────────────────────────────────────────────
 
-  async listOrders(filters?: { status?: OrderStatus; asset?: string; type?: string; from?: Date; to?: Date; page?: number; limit?: number }) {
+  async listOrders(filters?: { accountId?: string; status?: OrderStatus; asset?: string; type?: string; from?: Date; to?: Date; page?: number; limit?: number }) {
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 25;
     const where: Prisma.P2POrderWhereInput = {};
 
+    if (filters?.accountId) where.accountId = filters.accountId;
     if (filters?.status) where.status = filters.status;
     if (filters?.asset) where.asset = filters.asset;
     if (filters?.type) where.type = filters.type as any;

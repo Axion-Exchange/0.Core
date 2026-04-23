@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { advertisementService } from '../services/advertisement.service.js';
 import { sendSuccess } from '../lib/response.js';
 import { z } from 'zod';
-import { BadRequestError } from '../middleware/error.js';
+import { ValidationError } from '../middleware/error.js';
 
 export const getAdvertisementsHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -23,7 +23,7 @@ export const patchAdvertisementStatusHandler = async (req: Request, res: Respons
     
     const parsed = updateStatusSchema.safeParse(req.body);
     if (!parsed.success) {
-      throw new BadRequestError('Invalid status payload');
+      throw new ValidationError('Invalid status payload');
     }
 
     // Attempt to pull admin ID from auth middleware if available

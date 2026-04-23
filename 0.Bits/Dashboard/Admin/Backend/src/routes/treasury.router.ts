@@ -11,9 +11,9 @@ const router = Router();
 router.use(optionalAuth);
 
 // GET /portfolio — Aggregated NAV across all currencies
-router.get('/portfolio', async (_req, res, next) => {
+router.get('/portfolio', async (req, res, next) => {
   try {
-    const summary = await treasuryService.getPortfolioSummary();
+    const summary = await treasuryService.getPortfolioSummary(req.query.accountId as string);
     sendSuccess(res, summary);
   } catch (err) { next(err); }
 });
@@ -27,17 +27,17 @@ router.get('/portfolio/:currency', async (req, res, next) => {
 });
 
 // GET /balances — Live exchange + fiat balances
-router.get('/balances', async (_req, res, next) => {
+router.get('/balances', async (req, res, next) => {
   try {
-    const balances = await treasuryService.getBalances();
+    const balances = await treasuryService.getBalances(req.query.accountId as string);
     sendSuccess(res, balances);
   } catch (err) { next(err); }
 });
 
 // GET /balances-aggregated — For React Frontend Integration (Balances Page)
-router.get('/balances-aggregated', async (_req, res, next) => {
+router.get('/balances-aggregated', async (req, res, next) => {
   try {
-    const data = await treasuryService.getAggregatedPortfolioView();
+    const data = await treasuryService.getAggregatedPortfolioView(req.query.accountId as string);
     sendSuccess(res, data);
   } catch(err) { next(err); }
 });

@@ -2,7 +2,7 @@ import { prisma } from '../lib/db.js';
 import { binanceService } from './binance.service.js';
 import { getSocket } from '../lib/socket.js';
 import { createLogger } from '../lib/logger.js';
-import { NotFoundError, BadRequestError } from '../middleware/error.js';
+import { NotFoundError, ValidationError } from '../middleware/error.js';
 
 const log = createLogger('advertisement-service');
 
@@ -31,7 +31,7 @@ export class AdvertisementService {
     }
 
     if (!ad.externalAdId) {
-      throw new BadRequestError('Advertisement is not linked to a Binance external ID');
+      throw new ValidationError('Advertisement is not linked to a Binance external ID');
     }
 
     // 1. Call Binance
