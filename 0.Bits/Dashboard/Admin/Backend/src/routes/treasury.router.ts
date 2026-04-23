@@ -99,8 +99,8 @@ router.get('/export-capital-flows', async (req, res, next) => {
     }
 
     let typeFilter = undefined;
-    if (types && typeof types === 'string') {
-      const requestedTypes = types.split(',');
+    if (req.query.types && typeof req.query.types === 'string') {
+      const requestedTypes = req.query.types.split(',');
       typeFilter = { in: requestedTypes };
     }
 
@@ -110,19 +110,33 @@ router.get('/export-capital-flows', async (req, res, next) => {
       accountFilter = { label: { in: requestedAccounts } };
     }
 
-    const where: any = {};
-    if (Object.keys(dateFilter).length > 0) where.timestamp = dateFilter;
-    if (typeFilter) where.type = typeFilter;
-    if (accountFilter) where.account = accountFilter;
+    // Base where for ExchangeCapitalFlow
+    const flowsWhere: any = {};
+    if (Object.keys(dateFilter).length > 0) flowsWhere.timestamp = dateFilter;
+    if (accountFilter) flowsWhere.account = accountFilter;
+    
+    let shouldQueryFlows = true;
+
+    // Filter out ACCOUNT_BALANCES from CapitalFlow queries because it is not a valid enum value
+    if (typeFilter) {
+      const validFlowTypes = typeFilter.in.filter((t: string) => t !== 'ACCOUNT_BALANCES');
+      if (validFlowTypes.length > 0) {
+        flowsWhere.type = { in: validFlowTypes };
+      } else {
+        // If they ONLY requested ACCOUNT_BALANCES, don't query ExchangeCapitalFlow
+        shouldQueryFlows = false;
+      }
+    }
 
     // We must fetch from both ExchangeCapitalFlow AND BalanceLedger (if "ACCOUNT_BALANCES" is requested)
     const { prisma } = await import('../lib/db.js');
     
     let csvData = `Date,Account,Type,Asset,Amount,Status,External ID\n`;
 
-    if (!typeFilter || typeFilter.in.includes('DEPOSIT') || typeFilter.in.includes('WITHDRAWAL') || typeFilter.in.includes('INTERNAL_TRANSFER') || typeFilter.in.includes('CONVERSION')) {
+    // Only query ExchangeCapitalFlow if they didn't EXCLUSIVELY ask for ACCOUNT_BALANCES
+    if (shouldQueryFlows) {
       const flows = await prisma.exchangeCapitalFlow.findMany({
-        where,
+        where: flowsWhere,
         include: { account: true },
         orderBy: { timestamp: 'desc' },
         take: 10000 // reasonable limit for direct export
