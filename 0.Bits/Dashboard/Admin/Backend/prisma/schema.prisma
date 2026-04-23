@@ -199,6 +199,7 @@ model User {
   totalTrades   Int       @default(0)
   notes         String?
   metadata      Json? // Flexible key-value store
+  lastKycRequestedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

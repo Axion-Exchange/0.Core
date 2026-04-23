@@ -84,6 +84,16 @@ router.post('/:id/request-kyc', validateParams(idParamSchema), async (req, res, 
       return;
     }
 
+    // Spam Protection: Enforce 24-hour cooldown
+    if (user.lastKycRequestedAt) {
+      const hoursSinceLastRequest = (Date.now() - user.lastKycRequestedAt.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceLastRequest < 24) {
+        const hoursLeft = Math.ceil(24 - hoursSinceLastRequest);
+        res.status(429).json({ success: false, error: `Rate limited. Please wait ${hoursLeft} hours before sending another request.` });
+        return;
+      }
+    }
+
     // Get the most recent order for this user
     const recentOrder = await prisma.p2POrder.findFirst({
       where: { userId },
@@ -102,6 +112,12 @@ router.post('/:id/request-kyc', validateParams(idParamSchema), async (req, res, 
     const connector = await exchangeService.getBinanceConnector(recentOrder.accountId || undefined);
     const message = `Our Banking provider is asking for your details could you please complete this: ${session.sessionUrl}`;
     await connector.sendChatMessage(recentOrder.externalOrderId, message);
+
+    // Update last requested timestamp
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastKycRequestedAt: new Date() }
+    });
 
     sendSuccess(res, { message: 'KYC request sent via chat', sessionUrl: session.sessionUrl });
   } catch (err) { next(err); }

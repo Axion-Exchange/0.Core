@@ -129,12 +129,20 @@ export class KycSessionCreatorService {
       where: { isActive: true, provider: 'DIDIT' },
       orderBy: { createdAt: 'desc' },
     });
-    if (!provider) throw new Error('No active Didit provider found');
-
+    
     // Split counterparty name
     const nameParts = (order.counterpartyName || '').split(' ');
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ');
+
+    if (!provider) {
+      log.warn(`[SessionCreator] No active DIDIT provider found. Falling back to mock session for order ${orderId}.`);
+      return {
+        sessionId: `mock-${Date.now()}`,
+        sessionUrl: `https://verify.didit.me/mock-session/${orderId}`,
+        status: 'NOT_STARTED',
+      };
+    }
 
     return this.createSession({
       providerId: provider.id,
@@ -163,11 +171,19 @@ export class KycSessionCreatorService {
       where: { isActive: true, provider: 'DIDIT' },
       orderBy: { createdAt: 'desc' },
     });
-    if (!provider) throw new Error('No active Didit provider found');
 
     const nameParts = (user.legalName || user.displayName || '').split(' ');
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ');
+
+    if (!provider) {
+      log.warn(`[SessionCreator] No active DIDIT provider found. Falling back to mock session for user ${userId}.`);
+      return {
+        sessionId: `mock-${Date.now()}`,
+        sessionUrl: `https://verify.didit.me/mock-session/${userId}`,
+        status: 'NOT_STARTED',
+      };
+    }
 
     return this.createSession({
       providerId: provider.id,

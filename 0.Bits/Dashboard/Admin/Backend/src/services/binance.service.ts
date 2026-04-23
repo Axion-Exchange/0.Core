@@ -6,6 +6,7 @@ import { P2PAccount } from '@prisma/client';
 import { prisma } from '../lib/db.js';
 import * as crypto from 'crypto';
 import fs from 'fs';
+import { BinanceP2PConnector } from './exchange/binance-p2p.connector.js';
 
 export class BinanceService {
   constructor() {
@@ -161,9 +162,10 @@ export class BinanceService {
     if (!enabled) return [];
 
     try {
-      // Binance SAPI endpoint: GET /sapi/v1/c2c/ads/getAdList
+      // Binance SAPI endpoint: POST /sapi/v1/c2c/ads/listWithPagination
       // Returns the merchant's own advertisement configurations
-      const payload = await client.request('c2c/ads/getAdList', 'sapi', 'GET', {
+      const connector = new BinanceP2PConnector(client);
+      const payload = await connector.listAdsWithPagination({
         page: 1,
         rows: 100,
       });
@@ -235,6 +237,32 @@ export class BinanceService {
     } catch (e: any) {
        console.warn(`CCXT SAPI Chat Explicit Sync Fault Mapping: ${e.message}`);
        throw e;
+    }
+  }
+
+  /**
+   * Sends a chat message to a specific P2P order.
+   */
+  async sendChatMessage(orderId: string, message: string, account?: P2PAccount): Promise<boolean> {
+    const targetAccount = account || await this.getDefaultAccount();
+    const { enabled, client } = this.getClient(targetAccount);
+    if (!enabled) return false;
+
+    try {
+      const payload = await client.request('c2c/chat/sendMsg', 'sapi', 'POST', {
+        orderNo: orderId,
+        content: message,
+      });
+
+      if (payload && payload.code === '000000') {
+        return true;
+      }
+      
+      logger.warn(`[BinanceService] sendChatMessage returned: ${payload?.code} ${payload?.message}`);
+      return false;
+    } catch (err: any) {
+      logger.error(`[BinanceService] sendChatMessage error for ${orderId}:`, err.message || err);
+      return false;
     }
   }
 }
