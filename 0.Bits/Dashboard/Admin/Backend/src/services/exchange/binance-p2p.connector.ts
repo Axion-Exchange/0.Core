@@ -72,8 +72,30 @@ export class BinanceP2PConnector {
     return this.client.request('c2c/ads/update', 'sapi', 'POST', params);
   }
 
-  async updateAdStatus(advNos: string[], advStatus: number) {
-    return this.client.request('c2c/ads/updateStatus', 'sapi', 'POST', { advNos, advStatus });
+  async updateAdStatus(advNos: string[], advStatus: number): Promise<any> {
+    const timestamp = Date.now();
+    const queryPayload = `timestamp=${timestamp}`;
+    let signature: string;
+
+    if (this.client.secret && (this.client.secret.includes('BEGIN PRIVATE KEY') || this.client.secret.includes('BEGIN RSA PRIVATE KEY'))) {
+      const signer = crypto.createSign('RSA-SHA256');
+      signer.update(queryPayload);
+      signer.end();
+      signature = encodeURIComponent(signer.sign(this.client.secret, 'base64'));
+    } else {
+      signature = crypto.createHmac('sha256', this.client.secret).update(queryPayload).digest('hex');
+    }
+
+    const rawRes = await fetch(`https://api.binance.com/sapi/v1/c2c/ads/updateStatus?${queryPayload}&signature=${signature}`, {
+        method: 'POST',
+        headers: {
+          'X-MBX-APIKEY': this.client.apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ advNos, advStatus })
+    });
+
+    return rawRes.json();
   }
 
   /**

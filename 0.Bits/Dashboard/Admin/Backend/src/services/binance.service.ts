@@ -197,16 +197,15 @@ export class BinanceService {
     if (!enabled) return false;
 
     try {
-      const payload = await client.request('c2c/ad/updateStatus', 'sapi', 'POST', {
-        adNo: adNumber,
-        status: status === 'Active' ? 1 : 2
-      });
+      const connector = new BinanceP2PConnector(client);
+      // Status mapping: 1 for Active (Online), 2 for Paused (Offline)
+      const payload = await connector.updateAdStatus([adNumber], status === 'Active' ? 1 : 2);
 
       if (payload && payload.code === '000000') {
         return true;
       }
       
-      logger.warn(`[BinanceService] toggleAdStatus returned: ${payload?.code} ${payload?.message}`);
+      logger.warn(`[BinanceService] toggleAdStatus returned: ${payload?.code} ${payload?.msg || payload?.message}`);
       return false;
     } catch (err: any) {
       logger.error(`[BinanceService] toggleAdStatus error for ${adNumber}:`, err.message || err);
