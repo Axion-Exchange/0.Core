@@ -305,38 +305,40 @@ export class TreasuryService {
     });
 
     // We will organize by Asset (USDT, BTC, etc.)
-    const assets = new Map<string, { available: number; pendingBuys: number }>();
+    const assets = new Map<string, { available: number; locked: number; pendingBuys: number }>();
     
     // We will also organize by Account + Asset for the detail breakdown
-    const accountDetailsMap = new Map<string, { accountLabel: string, asset: string, available: number, pendingBuys: number }>();
+    const accountDetailsMap = new Map<string, { accountLabel: string, asset: string, available: number, locked: number, pendingBuys: number }>();
 
     // Pre-seed all active accounts with at least USDT so they show up in the UI even if empty
     for (const acc of activeAccounts) {
       const accLabel = acc.label || 'Default';
       const key = `${accLabel}-USDT`;
-      accountDetailsMap.set(key, { accountLabel: accLabel, asset: 'USDT', available: 0, pendingBuys: 0 });
+      accountDetailsMap.set(key, { accountLabel: accLabel, asset: 'USDT', available: 0, locked: 0, pendingBuys: 0 });
     }
 
     // Seed map with exchange balances
     for (const b of fundingBalances) {
-      if (!assets.has(b.currency)) assets.set(b.currency, { available: 0, pendingBuys: 0 });
+      if (!assets.has(b.currency)) assets.set(b.currency, { available: 0, locked: 0, pendingBuys: 0 });
       assets.get(b.currency)!.available += b.available;
+      assets.get(b.currency)!.locked += b.locked || 0;
       
       const key = `${b.accountLabel}-${b.currency}`;
-      if (!accountDetailsMap.has(key)) accountDetailsMap.set(key, { accountLabel: b.accountLabel, asset: b.currency, available: 0, pendingBuys: 0 });
+      if (!accountDetailsMap.has(key)) accountDetailsMap.set(key, { accountLabel: b.accountLabel, asset: b.currency, available: 0, locked: 0, pendingBuys: 0 });
       accountDetailsMap.get(key)!.available += b.available;
+      accountDetailsMap.get(key)!.locked += b.locked || 0;
     }
 
     // Add pending buys
     for (const order of activeBuys) {
       const asset = order.asset.toUpperCase();
-      if (!assets.has(asset)) assets.set(asset, { available: 0, pendingBuys: 0 });
+      if (!assets.has(asset)) assets.set(asset, { available: 0, locked: 0, pendingBuys: 0 });
       assets.get(asset)!.pendingBuys += Number(order.amount);
       
       const acc = activeAccounts.find((a: any) => a.id === order.accountId);
       const accLabel = acc?.label || 'Default';
       const key = `${accLabel}-${asset}`;
-      if (!accountDetailsMap.has(key)) accountDetailsMap.set(key, { accountLabel: accLabel, asset: asset, available: 0, pendingBuys: 0 });
+      if (!accountDetailsMap.has(key)) accountDetailsMap.set(key, { accountLabel: accLabel, asset: asset, available: 0, locked: 0, pendingBuys: 0 });
       accountDetailsMap.get(key)!.pendingBuys += Number(order.amount);
     }
 
@@ -345,8 +347,7 @@ export class TreasuryService {
     let totalUsd = 0; // Strictly speaking, we assume USDT=1 USD here, and perhaps fetch live rates for BTC/ETH if requested later
 
     for (const [asset, data] of assets) {
-      const totalAsset = data.available + data.pendingBuys;
-      if (totalAsset <= 0) continue;
+      const totalAsset = data.available + data.locked + data.pendingBuys;
 
       let usdValue = totalAsset; 
       // Very basic mock price conversion for UI showcase if not strictly USDT
@@ -360,12 +361,13 @@ export class TreasuryService {
         balance: totalAsset.toLocaleString(undefined, { maximumFractionDigits: 4 }),
         usdValue,
         available: data.available,
+        locked: data.locked,
         pendingBuys: data.pendingBuys
       });
     }
     
     for (const [key, data] of accountDetailsMap) {
-      const totalAsset = data.available + data.pendingBuys;
+      const totalAsset = data.available + data.locked + data.pendingBuys;
       
       let usdValue = totalAsset;
       if (data.asset === "BTC") usdValue *= 95000;
@@ -379,6 +381,7 @@ export class TreasuryService {
         balanceFormatted: totalAsset.toLocaleString(undefined, { maximumFractionDigits: 4 }),
         usdValue,
         available: data.available,
+        locked: data.locked,
         pendingBuys: data.pendingBuys
       });
     }

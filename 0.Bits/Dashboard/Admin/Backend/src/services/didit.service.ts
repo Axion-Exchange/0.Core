@@ -45,7 +45,7 @@ export class DiditService {
     }
 
     try {
-      const apiKey = decrypt(provider.apiKey);
+      const apiKey = provider.apiKey;
       const url = `${provider.baseUrl.replace(/\/$/, '')}/session/`;
 
       const payload = {
@@ -92,7 +92,7 @@ export class DiditService {
     }
 
     try {
-      const apiKey = decrypt(provider.apiKey);
+      const apiKey = provider.apiKey;
       const url = `${provider.baseUrl.replace(/\/$/, '')}/session/${sessionId}/decision/`;
 
       const res = await fetch(url, {
@@ -127,7 +127,7 @@ export class DiditService {
     }
 
     try {
-      const apiKey = decrypt(provider.apiKey);
+      const apiKey = provider.apiKey;
       // Attempting PDF endpoint as per standard API structures
       const pdfUrl = `${provider.baseUrl.replace(/\/$/, '')}/session/${sessionId}/pdf/`;
       
