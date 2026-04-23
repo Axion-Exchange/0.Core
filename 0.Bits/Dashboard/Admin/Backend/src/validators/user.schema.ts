@@ -33,6 +33,7 @@ export const userListQuerySchema = z.object({
   kycStatus: z.enum(['NOT_STARTED', 'PENDING', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED']).optional(),
   isBlocked: z.coerce.boolean().optional(),
   isFrozen: z.coerce.boolean().optional(),
+  minVolume: z.coerce.number().min(0).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   sortBy: z.enum(['createdAt', 'displayName', 'totalVolume', 'riskScore']).default('createdAt'),

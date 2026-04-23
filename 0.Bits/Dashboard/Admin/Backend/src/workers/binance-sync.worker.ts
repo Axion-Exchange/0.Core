@@ -231,6 +231,88 @@ class BinanceSyncWorker {
       this.isRunning = false;
       // Run stale order reconciliation after sync (throttled to every 10th tick)
       this.reconcileStaleOrders().catch(e => log.warn('Reconciliation error:', e.message));
+      // Sync advertisements from Binance (throttled to every 5th tick ~2.5 min)
+      this.syncAdvertisements().catch(e => log.warn('Ad sync error:', e.message));
+    }
+  }
+
+  /**
+   * Sync merchant advertisements from all active Binance accounts.
+   * Pulls live ad configs from SAPI and upserts into P2PAdvertisement.
+   * Runs every 5th tick (~2.5 minutes at 30s intervals).
+   */
+  private adSyncTickCount = 0;
+  private async syncAdvertisements() {
+    this.adSyncTickCount++;
+    if (this.adSyncTickCount % 5 !== 0) return;
+
+    try {
+      const activeAccounts = await prisma.p2PAccount.findMany({
+        where: { exchange: 'BINANCE', isActive: true }
+      });
+
+      if (activeAccounts.length === 0) return;
+
+      let totalSynced = 0;
+
+      for (const account of activeAccounts) {
+        try {
+          const ads = await binanceService.fetchMerchantAds(account);
+          if (!ads || ads.length === 0) continue;
+
+          for (const ad of ads) {
+            const adNo = ad.advNo || ad.adsNo || ad.adNo;
+            if (!adNo) continue;
+
+            const statusRaw = (ad.advStatus || ad.status || '').toString().toUpperCase();
+            let mappedStatus: 'ACTIVE' | 'PAUSED' = 'PAUSED';
+            if (statusRaw === '1' || statusRaw === 'ONLINE' || statusRaw === 'ACTIVE') {
+              mappedStatus = 'ACTIVE';
+            }
+
+            await prisma.p2PAdvertisement.upsert({
+              where: { externalAdId: adNo },
+              create: {
+                accountId: account.id,
+                externalAdId: adNo,
+                asset: ad.asset || ad.cryptoCurrency || 'USDT',
+                fiat: ad.fiatUnit || ad.fiat || 'EUR',
+                type: (ad.tradeType === 'SELL' || ad.advType === 'SELL') ? 'SELL' : 'BUY',
+                price: parseFloat(ad.price || ad.advPrice || '0'),
+                marginPercent: parseFloat(ad.priceFloatingRatio || ad.marginPercent || '0'),
+                minLimit: parseFloat(ad.minSingleTransAmount || ad.minLimit || '0'),
+                maxLimit: parseFloat(ad.maxSingleTransAmount || ad.maxLimit || '0'),
+                availableQty: parseFloat(ad.surplusAmount || ad.dynamicMaxAmount || ad.availableQty || '0'),
+                status: mappedStatus,
+                autoReply: ad.autoReplyMsg || null,
+                remarks: ad.remarks || null,
+                metadata: ad,
+              },
+              update: {
+                price: parseFloat(ad.price || ad.advPrice || '0'),
+                marginPercent: parseFloat(ad.priceFloatingRatio || ad.marginPercent || '0'),
+                minLimit: parseFloat(ad.minSingleTransAmount || ad.minLimit || '0'),
+                maxLimit: parseFloat(ad.maxSingleTransAmount || ad.maxLimit || '0'),
+                availableQty: parseFloat(ad.surplusAmount || ad.dynamicMaxAmount || ad.availableQty || '0'),
+                status: mappedStatus,
+                autoReply: ad.autoReplyMsg || null,
+                remarks: ad.remarks || null,
+                metadata: ad,
+              },
+            });
+
+            totalSynced++;
+          }
+        } catch (accErr: any) {
+          log.warn(`Ad sync failed for account ${account.label}: ${accErr.message}`);
+        }
+      }
+
+      if (totalSynced > 0) {
+        log.info(`[AdSync] Synchronized ${totalSynced} advertisements from ${activeAccounts.length} account(s).`);
+      }
+    } catch (err: any) {
+      log.error(`[AdSync] Global ad sync failed:`, err.message);
     }
   }
 

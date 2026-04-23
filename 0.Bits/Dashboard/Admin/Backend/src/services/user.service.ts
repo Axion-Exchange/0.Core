@@ -4,7 +4,7 @@ import { NotFoundError } from '../middleware/error.js';
 import type { KYCStatus, Prisma } from '@prisma/client';
 
 export class UserService {
-  async list(filters: { search?: string; kycStatus?: KYCStatus; isBlocked?: boolean; isFrozen?: boolean; page: number; limit: number; sortBy: string; sortOrder: string }) {
+  async list(filters: { search?: string; kycStatus?: KYCStatus; isBlocked?: boolean; isFrozen?: boolean; minVolume?: number; page: number; limit: number; sortBy: string; sortOrder: string }) {
     const where: Prisma.UserWhereInput = {};
 
     if (filters.search) {
@@ -17,6 +17,7 @@ export class UserService {
     if (filters.kycStatus) where.kycStatus = filters.kycStatus;
     if (filters.isBlocked !== undefined) where.isBlocked = filters.isBlocked;
     if (filters.isFrozen !== undefined) where.isFrozen = filters.isFrozen;
+    if (filters.minVolume !== undefined) where.totalVolume = { gte: filters.minVolume };
 
     const [data, total] = await Promise.all([
       prisma.user.findMany({

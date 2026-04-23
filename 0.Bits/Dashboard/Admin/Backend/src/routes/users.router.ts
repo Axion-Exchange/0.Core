@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { userService } from '../services/user.service.js';
+import { kycSessionCreator } from '../services/kyc-session-creator.service.js';
+import { exchangeService } from '../services/exchange.service.js';
+import { prisma } from '../lib/db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { auditLog } from '../middleware/audit.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate.js';
@@ -58,6 +61,49 @@ router.put('/:id/block', validateParams(idParamSchema), validateBody(blockUserSc
   try {
     const user = await userService.block(param(req, 'id'), req.body.blocked, req.body.reason);
     sendSuccess(res, user);
+  } catch (err) { next(err); }
+});
+
+// POST /:id/generate-kyc-link
+router.post('/:id/generate-kyc-link', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), async (req, res, next) => {
+  try {
+    const result = await kycSessionCreator.createSessionForUser(param(req, 'id'));
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
+// POST /:id/request-kyc
+router.post('/:id/request-kyc', requireRole('ADMIN', 'SUPER_ADMIN'), validateParams(idParamSchema), async (req, res, next) => {
+  try {
+    const userId = param(req, 'id');
+    const user = await userService.getById(userId);
+    
+    // Security Check: Only request if KYC is NOT APPROVED
+    if (user.kycStatus === 'APPROVED') {
+      res.status(400).json({ success: false, error: 'User is already KYC approved' });
+      return;
+    }
+
+    // Get the most recent order for this user
+    const recentOrder = await prisma.p2POrder.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!recentOrder || !recentOrder.externalOrderId) {
+      res.status(400).json({ success: false, error: 'No recent Binance order found to send a message to' });
+      return;
+    }
+
+    // Generate link
+    const session = await kycSessionCreator.createSessionForUser(userId);
+
+    // Send chat message
+    const connector = await exchangeService.getBinanceConnector(recentOrder.accountId || undefined);
+    const message = `Our Banking provider is asking for your details could you please complete this: ${session.sessionUrl}`;
+    await connector.sendChatMessage(recentOrder.externalOrderId, message);
+
+    sendSuccess(res, { message: 'KYC request sent via chat', sessionUrl: session.sessionUrl });
   } catch (err) { next(err); }
 });
 

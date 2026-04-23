@@ -152,4 +152,23 @@ export class BinanceP2PConnector {
        throw error;
     }
   }
+
+  /**
+   * Send Chat Message to P2P Order
+   * Connects to undocumented SAPI chat endpoint to automate KYC requests
+   */
+  async sendChatMessage(orderNo: string, content: string) {
+    log.info(`Sending chat message for order [${orderNo}]`);
+    try {
+      // Trying standard SAPI endpoint mapping
+      const response = await this.client.request('c2c/chat/sendMsg', 'sapi', 'POST', {
+        orderNo,
+        content
+      });
+      return response;
+    } catch (error) {
+      log.error(`Failed to send chat message for order [${orderNo}]`, { error });
+      throw error;
+    }
+  }
 }

@@ -3,6 +3,8 @@ import { safeTransaction } from '../lib/transaction.js';
 import { encrypt, decrypt } from '../lib/crypto.js';
 import { NotFoundError } from '../middleware/error.js';
 import type { AdStatus, OrderStatus, DisputeStatus, Prisma } from '@prisma/client';
+import { binanceService } from './binance.service.js';
+import { getSocket } from '../lib/socket.js';
 
 export class P2PService {
   // ── Accounts ───────────────────────────────────────────
@@ -84,10 +86,33 @@ export class P2PService {
   }
 
   async toggleAd(id: string, enabled: boolean) {
-    return prisma.p2PAdvertisement.update({
+    const ad = await prisma.p2PAdvertisement.findUnique({
+      where: { id },
+      include: { account: true }
+    });
+
+    if (!ad) throw new NotFoundError('Advertisement', id);
+
+    if (ad.externalAdId && ad.account.exchange === 'BINANCE') {
+       const success = await binanceService.toggleAdStatus(ad.externalAdId, enabled ? 'Active' : 'Paused', ad.account);
+       if (!success) {
+         throw new Error(`Failed to toggle ad ${ad.externalAdId} on Binance`);
+       }
+    }
+
+    const updated = await prisma.p2PAdvertisement.update({
       where: { id },
       data: { status: enabled ? 'ACTIVE' : 'PAUSED' },
     });
+
+    try {
+      const io = getSocket();
+      io.emit('ad:update', { id: updated.id, status: updated.status, externalAdId: updated.externalAdId });
+    } catch(err) {
+      // Ignore socket errors if no clients connected
+    }
+
+    return updated;
   }
 
   // ── Orders ─────────────────────────────────────────────

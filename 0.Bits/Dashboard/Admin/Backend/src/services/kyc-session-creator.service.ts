@@ -148,6 +148,39 @@ export class KycSessionCreatorService {
       },
     });
   }
+
+  /**
+   * Create a session specifically for a user (without an order context).
+   */
+  async createSessionForUser(userId: string, email?: string): Promise<CreateSessionResult> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, legalName: true, externalId: true },
+    });
+    if (!user) throw new Error(`User ${userId} not found`);
+
+    const provider = await prisma.kycProvider.findFirst({
+      where: { isActive: true, provider: 'DIDIT' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!provider) throw new Error('No active Didit provider found');
+
+    const nameParts = (user.legalName || user.displayName || '').split(' ');
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(' ');
+
+    return this.createSession({
+      providerId: provider.id,
+      vendorData: `user:${user.externalId || userId}`,
+      email: email || undefined,
+      firstName,
+      lastName,
+      metadata: {
+        user_id: userId,
+        binance_uid: user.externalId || '',
+      },
+    });
+  }
 }
 
 export const kycSessionCreator = new KycSessionCreatorService();

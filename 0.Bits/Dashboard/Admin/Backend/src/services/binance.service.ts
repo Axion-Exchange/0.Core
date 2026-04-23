@@ -167,6 +167,66 @@ export class BinanceService {
       return [];
     }
   }
+
+  /**
+   * Fetches the merchant's OWN P2P advertisements from Binance SAPI.
+   * This returns all ads belonging to the authenticated API key holder.
+   * Supports multi-account by accepting a P2PAccount parameter.
+   */
+  async fetchMerchantAds(account?: P2PAccount): Promise<any[]> {
+    const { enabled, client } = this.getClient(account);
+    if (!enabled) return [];
+
+    try {
+      // Binance SAPI endpoint: GET /sapi/v1/c2c/ads/getAdList
+      // Returns the merchant's own advertisement configurations
+      const payload = await client.request('c2c/ads/getAdList', 'sapi', 'GET', {
+        page: 1,
+        rows: 100,
+      });
+
+      if (payload && payload.code === '000000' && payload.data) {
+        return Array.isArray(payload.data) ? payload.data : [];
+      }
+
+      // Some SAPI versions nest under payload.data.data
+      if (payload?.data?.data && Array.isArray(payload.data.data)) {
+        return payload.data.data;
+      }
+
+      logger.warn(`[BinanceService] fetchMerchantAds returned: ${payload?.code} ${payload?.message || 'unknown'}`);
+      return [];
+    } catch (err: any) {
+      logger.error(`[BinanceService] fetchMerchantAds error:`, err.message || err);
+      return [];
+    }
+  }
+
+  /**
+   * Toggles the status of a P2P Advertisement on Binance
+   * status: 1 = Online (Active), 2 = Offline (Paused)
+   */
+  async toggleAdStatus(adNumber: string, status: 'Active' | 'Paused', account?: P2PAccount): Promise<boolean> {
+    const { enabled, client } = this.getClient(account);
+    if (!enabled) return false;
+
+    try {
+      const payload = await client.request('c2c/ad/updateStatus', 'sapi', 'POST', {
+        adNo: adNumber,
+        status: status === 'Active' ? 1 : 2
+      });
+
+      if (payload && payload.code === '000000') {
+        return true;
+      }
+      
+      logger.warn(`[BinanceService] toggleAdStatus returned: ${payload?.code} ${payload?.message}`);
+      return false;
+    } catch (err: any) {
+      logger.error(`[BinanceService] toggleAdStatus error for ${adNumber}:`, err.message || err);
+      return false;
+    }
+  }
   /**
    * Undocumented Binance SAPI extraction stub resolving the raw conversational payloads bound perfectly to exact Order IDs.
    * Note: This will naturally drop an exception alerting the service layer if the exact SAPI URL signature isn't mapped functionally natively!

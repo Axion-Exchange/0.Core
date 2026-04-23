@@ -62,6 +62,23 @@ export class ExchangeService {
   }
 
   /**
+   * Get a Binance P2P Connector instance.
+   */
+  async getBinanceConnector(accountId?: string): Promise<BinanceP2PConnector> {
+    await this.loadClients();
+    let account;
+    if (accountId) {
+      account = await prisma.p2PAccount.findUnique({ where: { id: accountId } });
+    } else {
+      account = await prisma.p2PAccount.findFirst({ where: { exchange: 'BINANCE', isActive: true } });
+    }
+    if (!account) throw new Error('No active Binance account found');
+    const client = this.clients.get(account.id);
+    if (!client) throw new Error('Binance CCXT client not initialized');
+    return new BinanceP2PConnector(client);
+  }
+
+  /**
    * Fetch balances concurrently from all configured CCXT instances.
    */
   async fetchAllBalances(): Promise<ExchangeBalance[]> {
