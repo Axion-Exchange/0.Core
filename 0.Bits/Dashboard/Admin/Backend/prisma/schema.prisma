@@ -96,6 +96,15 @@ enum TransactionStatus {
   REVERSED
 }
 
+enum CapitalFlowType {
+  DEPOSIT
+  WITHDRAWAL
+  INTERNAL_TRANSFER
+  CONVERSION
+  DUST
+  DIVIDEND
+}
+
 enum NodeStatus {
   ONLINE
   DEGRADED
@@ -328,6 +337,7 @@ model P2PAccount {
   portfolios     Portfolio[]
   balanceLedgers BalanceLedger[]
   pnlSnapshots   PnlSnapshot[]
+  capitalFlows   ExchangeCapitalFlow[]
 
   @@unique([exchange, label])
   @@map("p2p_accounts")
@@ -607,6 +617,27 @@ model Transaction {
   @@index([source])
   @@index([createdAt])
   @@map("transactions")
+}
+
+/// Raw capital flows extracted from Binance (Deposits, Withdrawals, Internal Transfers, Conversions)
+model ExchangeCapitalFlow {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String            @db.Uuid
+  externalId  String            @unique // Unique exchange tx id
+  asset       String            @db.VarChar(10) // USDT, BTC, etc.
+  amount      Decimal           @db.Decimal(24, 8)
+  type        CapitalFlowType
+  status      String            // e.g., "COMPLETED", "PENDING"
+  timestamp   DateTime
+  metadata    Json?             // full API response
+  createdAt   DateTime          @default(now())
+
+  account     P2PAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([type])
+  @@index([timestamp])
+  @@map("exchange_capital_flows")
 }
 
 // ┌──────────────────────────────────────────────────────────────────────────┐

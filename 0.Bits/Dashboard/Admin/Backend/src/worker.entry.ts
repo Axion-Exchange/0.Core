@@ -67,6 +67,11 @@ createWorker(QUEUE_NAMES.KYC_SYNC, async (job) => {
   await kycSyncWorker.run();
 });
 
+createWorker(QUEUE_NAMES.CAPITAL_FLOW_SYNC, async (job) => {
+  const { capitalFlowSyncWorker } = await import('./workers/capital-flow-sync.worker.js');
+  await capitalFlowSyncWorker.run();
+});
+
 // ── Health Check Worker ────────────────────────────────
 import { runAllHealthChecks } from "./services/health-checker.service.js";
 createWorker(QUEUE_NAMES.HEALTH_CHECK, async () => {

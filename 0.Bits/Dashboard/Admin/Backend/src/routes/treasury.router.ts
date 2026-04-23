@@ -83,4 +83,69 @@ router.post('/sync', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /export-capital-flows — Download CSV of capital flow ledger
+router.get('/export-capital-flows', async (req, res, next) => {
+  try {
+    const { days, types } = req.query as any;
+    
+    let dateFilter = {};
+    if (days && days !== 'all') {
+      const parsedDays = parseInt(days);
+      if (!isNaN(parsedDays)) {
+        dateFilter = {
+          gte: new Date(Date.now() - parsedDays * 24 * 60 * 60 * 1000)
+        };
+      }
+    }
+
+    let typeFilter = undefined;
+    if (types && typeof types === 'string') {
+      const requestedTypes = types.split(',');
+      typeFilter = { in: requestedTypes };
+    }
+
+    const where: any = {};
+    if (Object.keys(dateFilter).length > 0) where.timestamp = dateFilter;
+    if (typeFilter) where.type = typeFilter;
+
+    // We must fetch from both ExchangeCapitalFlow AND BalanceLedger (if "ACCOUNT_BALANCES" is requested)
+    const { prisma } = await import('../lib/db.js');
+    
+    let csvData = `Date,Account,Type,Asset,Amount,Status,External ID\n`;
+
+    if (!typeFilter || typeFilter.in.includes('DEPOSIT') || typeFilter.in.includes('WITHDRAWAL') || typeFilter.in.includes('INTERNAL_TRANSFER') || typeFilter.in.includes('CONVERSION')) {
+      const flows = await prisma.exchangeCapitalFlow.findMany({
+        where,
+        include: { account: true },
+        orderBy: { timestamp: 'desc' },
+        take: 10000 // reasonable limit for direct export
+      });
+      
+      for (const f of flows) {
+        csvData += `"${f.timestamp.toISOString()}","${f.account.label}","${f.type}","${f.asset}",${f.amount},"${f.status}","${f.externalId}"\n`;
+      }
+    }
+
+    if (!typeFilter || typeFilter.in.includes('ACCOUNT_BALANCES')) {
+      const balanceWhere: any = {};
+      if (Object.keys(dateFilter).length > 0) balanceWhere.snapshotAt = dateFilter;
+      
+      const balances = await prisma.balanceLedger.findMany({
+        where: balanceWhere,
+        include: { account: true },
+        orderBy: { snapshotAt: 'desc' },
+        take: 10000
+      });
+      
+      for (const b of balances) {
+        csvData += `"${b.snapshotAt.toISOString()}","${b.account?.label || b.source}","ACCOUNT_BALANCE","${b.currency}",${b.available},"COMPLETED","snapshot-${b.id}"\n`;
+      }
+    }
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`capital_flows_export_${new Date().toISOString()}.csv`);
+    return res.send(csvData);
+  } catch (err) { next(err); }
+});
+
 export { router as treasuryRouter };

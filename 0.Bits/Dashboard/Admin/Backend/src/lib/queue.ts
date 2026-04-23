@@ -37,6 +37,7 @@ export const QUEUE_NAMES = {
   BIGQUERY_SYNC: 'bigquery-sync',
   FRAUD_SCAN: 'fraud-scan',
   BITGET_SPOT_SYNC: 'bitget-spot-sync',
+  CAPITAL_FLOW_SYNC: 'capital-flow-sync',
 } as const;
 
 type QueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];
@@ -132,6 +133,7 @@ export async function registerRepeatableJobs(): Promise<void> {
     { queue: QUEUE_NAMES.BIGQUERY_SYNC,   every: 21600000, name: 'bq-sync-tick' },
     { queue: QUEUE_NAMES.FRAUD_SCAN,      every: 21600000, name: 'fraud-scan-tick' },
     { queue: QUEUE_NAMES.BITGET_SPOT_SYNC, every: 600000, name: 'bitget-spot-tick' },
+    { queue: QUEUE_NAMES.CAPITAL_FLOW_SYNC, every: 30000, name: 'capital-flow-sync-tick' },
   ];
 
   for (const { queue, every, name } of schedules) {
