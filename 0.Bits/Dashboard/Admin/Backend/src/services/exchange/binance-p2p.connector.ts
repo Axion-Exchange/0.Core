@@ -87,7 +87,7 @@ export class BinanceP2PConnector {
   }
 
   async updateMerchantAdSurplus(adsNo: string, newSurplusAmount: number) {
-    log.info(\`Executing VIP Surplus Math for [\${adsNo}] -> target: \${newSurplusAmount}\`);
+    log.info(`Executing VIP Surplus Math for [${adsNo}] -> target: ${newSurplusAmount}`);
     try {
       const detailRes = await this.getMerchantAdDetail(adsNo);
       const data = detailRes.data || detailRes;
@@ -95,11 +95,11 @@ export class BinanceP2PConnector {
       const surplusAmountBefore = parseFloat(data.surplusAmount || data.dynamicMaxAmount || data.remainingAmount);
 
       if (isNaN(initAmountBefore) || isNaN(surplusAmountBefore)) {
-         throw new Error(\`Failed to parse init/surplus values for ad \${adsNo}\`);
+         throw new Error(`Failed to parse init/surplus values for ad ${adsNo}`);
       }
 
       const initAmountAfter = initAmountBefore - surplusAmountBefore + newSurplusAmount;
-      log.info(\`Math executed: \${initAmountBefore} - \${surplusAmountBefore} + \${newSurplusAmount} = \${initAmountAfter}\`);
+      log.info(`Math executed: ${initAmountBefore} - ${surplusAmountBefore} + ${newSurplusAmount} = ${initAmountAfter}`);
 
       const updateRes = await this.client.request('c2c/ads/update', 'sapi', 'POST', {
         adsNo: adsNo,
@@ -108,7 +108,7 @@ export class BinanceP2PConnector {
 
       return updateRes;
     } catch (error) {
-      log.error(\`Failed to execute VIP Surplus Math on [\${adsNo}]\`, { error });
+      log.error(`Failed to execute VIP Surplus Math on [${adsNo}]`, { error });
       throw error;
     }
   }
@@ -265,7 +265,7 @@ export class BinanceP2PConnector {
   }
 
   async sendChatMessage(orderNo: string, content: string) {
-    log.info(\`Sending SAPI Chat message to [\${orderNo}]\`);
+    log.info(`Sending SAPI Chat message to [${orderNo}]`);
     return this.client.request('c2c/chat/sendMsg', 'sapi', 'POST', { orderNo, content });
   }
 
