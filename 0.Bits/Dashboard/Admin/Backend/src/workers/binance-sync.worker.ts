@@ -125,9 +125,16 @@ class BinanceSyncWorker {
           });
           userNodeId = userNode.id;
         } else if (mappedStatus === OrderStatus.COMPLETED && existingRecord.status !== OrderStatus.COMPLETED) {
-           const userNode = await prisma.user.update({
+           const userNode = await prisma.user.upsert({
              where: { externalId: counterpartyNickname },
-             data: {
+             create: {
+               externalId: counterpartyNickname,
+               displayName: counterpartyNameStr ? counterpartyNameStr : rawNickname,
+               legalName: counterpartyNameStr || null,
+               totalVolume: cryptoAmount,
+               totalTrades: 1
+             },
+             update: {
                 ...(counterpartyNameStr ? { legalName: counterpartyNameStr, displayName: counterpartyNameStr } : {}),
                 totalVolume: { increment: cryptoAmount },
                 totalTrades: { increment: 1 }
