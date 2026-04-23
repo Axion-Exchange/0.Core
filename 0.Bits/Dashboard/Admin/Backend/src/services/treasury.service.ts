@@ -310,6 +310,13 @@ export class TreasuryService {
     // We will also organize by Account + Asset for the detail breakdown
     const accountDetailsMap = new Map<string, { accountLabel: string, asset: string, available: number, pendingBuys: number }>();
 
+    // Pre-seed all active accounts with at least USDT so they show up in the UI even if empty
+    for (const acc of activeAccounts) {
+      const accLabel = acc.label || 'Default';
+      const key = `${accLabel}-USDT`;
+      accountDetailsMap.set(key, { accountLabel: accLabel, asset: 'USDT', available: 0, pendingBuys: 0 });
+    }
+
     // Seed map with exchange balances
     for (const b of fundingBalances) {
       if (!assets.has(b.currency)) assets.set(b.currency, { available: 0, pendingBuys: 0 });
@@ -359,7 +366,6 @@ export class TreasuryService {
     
     for (const [key, data] of accountDetailsMap) {
       const totalAsset = data.available + data.pendingBuys;
-      if (totalAsset <= 0) continue;
       
       let usdValue = totalAsset;
       if (data.asset === "BTC") usdValue *= 95000;
