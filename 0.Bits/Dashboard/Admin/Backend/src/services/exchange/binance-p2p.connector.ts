@@ -31,7 +31,7 @@ export class BinanceP2PConnector {
     return this.client.request('c2c/ads/getReferencePrice', 'sapi', 'POST', params);
   }
 
-  async listAdsWithPagination(params: Record<string, any> = {}) {
+  async listAdsWithPagination(params: Record<string, any> = {}): Promise<any> {
     const timestamp = Date.now();
     const queryPayload = `timestamp=${timestamp}`;
     let signature: string;
