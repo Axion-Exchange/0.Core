@@ -143,7 +143,7 @@ opsExtRouter.get("/pnl/daily", async (req: Request, res: Response) => {
   try {
     const currency = ((req.query.currency as string) || "EUR").toUpperCase();
     const days = parseInt((req.query.days as string) || "180", 10);
-    const snapshots = await getPnlTimeSeries(currency, days);
+    const snapshots = await getPnlTimeSeries(currency, days, req.query.accountId as string);
     res.json({ success: true, data: snapshots });
   } catch (err) {
     res.status(500).json({ success: false, error: (err as Error).message });

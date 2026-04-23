@@ -19,7 +19,7 @@ const updateStatusSchema = z.object({
 
 export const patchAdvertisementStatusHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     
     const parsed = updateStatusSchema.safeParse(req.body);
     if (!parsed.success) {

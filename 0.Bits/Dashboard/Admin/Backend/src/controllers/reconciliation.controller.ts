@@ -12,9 +12,10 @@ export class ReconciliationController {
       }
 
       const filePath = req.file.path;
+      const accountId = req.body.accountId; // Ensure it's passed from frontend
       
       // Process the CSV using our robust service
-      const stats = await ReconciliationService.processCSV(filePath);
+      const stats = await ReconciliationService.processCSV(filePath, accountId);
 
       // Clean up the uploaded file
       fs.unlink(filePath, (err) => {

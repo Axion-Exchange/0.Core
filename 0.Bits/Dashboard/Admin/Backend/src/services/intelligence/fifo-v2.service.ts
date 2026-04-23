@@ -95,18 +95,22 @@ export class FifoV2Engine {
     currency: string,
     periodStart?: Date,
     periodEnd?: Date,
+    accountId?: string,
   ): Promise<FifoPnLResult> {
     const now = new Date();
     const pStart = periodStart || new Date(2020, 0, 1);
     const pEnd = periodEnd || now;
 
+    const whereClause: any = {
+      fiat: currency,
+      status: OrderStatus.COMPLETED,
+      createdAt: { lte: pEnd },
+    };
+    if (accountId) whereClause.accountId = accountId;
+
     // Load ALL completed orders for this currency, sorted chronologically
     const allOrders = await this.db.p2POrder.findMany({
-      where: {
-        fiat: currency,
-        status: OrderStatus.COMPLETED,
-        createdAt: { lte: pEnd },
-      },
+      where: whereClause,
       orderBy: { createdAt: 'asc' },
     });
 
@@ -248,11 +252,14 @@ export class FifoV2Engine {
   /**
    * Compute FIFO P&L for ALL active currencies.
    */
-  async computeAll(periodStart?: Date, periodEnd?: Date): Promise<MultiCurrencyPnL> {
+  async computeAll(periodStart?: Date, periodEnd?: Date, accountId?: string): Promise<MultiCurrencyPnL> {
     // Discover which currencies have completed orders
+    const whereClause: any = { status: OrderStatus.COMPLETED };
+    if (accountId) whereClause.accountId = accountId;
+
     const activeCurrencies = await this.db.p2POrder.groupBy({
       by: ['fiat'],
-      where: { status: OrderStatus.COMPLETED },
+      where: whereClause,
       _count: true,
     });
 
@@ -260,7 +267,7 @@ export class FifoV2Engine {
     let totalPnlEur = new Decimal('0');
 
     for (const { fiat } of activeCurrencies) {
-      const result = await this.computeForCurrency(fiat, periodStart, periodEnd);
+      const result = await this.computeForCurrency(fiat, periodStart, periodEnd, accountId);
       currencies[fiat] = result;
 
       // Aggregate to EUR equivalent (rough conversion for non-EUR)
@@ -289,6 +296,7 @@ export class FifoV2Engine {
   async getSummary(
     currency: string,
     period: 'today' | 'yesterday' | 'week' | 'month' | 'all' = 'today',
+    accountId?: string,
   ): Promise<FifoPnLResult> {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -314,7 +322,7 @@ export class FifoV2Engine {
         break;
     }
 
-    return this.computeForCurrency(currency, fromDate, toDate);
+    return this.computeForCurrency(currency, fromDate, toDate, accountId);
   }
 }
 

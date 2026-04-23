@@ -78,7 +78,7 @@ router.get("/pnl-daily", async (req, res, next) => {
   try {
     const currency = ((req.query.currency as string) || "EUR").toUpperCase();
     const days = parseInt((req.query.days as string) || "180", 10);
-    const snapshots = await getPnlTimeSeries(currency, days);
+    const snapshots = await getPnlTimeSeries(currency, days, req.query.accountId as string);
     
     // Map to chart-friendly format
     const chartData = snapshots.map((s: any) => ({

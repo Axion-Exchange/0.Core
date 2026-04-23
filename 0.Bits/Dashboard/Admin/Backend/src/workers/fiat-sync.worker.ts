@@ -90,6 +90,7 @@ class FiatSyncWorker {
             pending: pendingAmount,
             metadata: { rawBalance: bal.balance, provider: bal.provider },
             snapshotAt: new Date(),
+            accountId: bal.accountId,
           }
         });
       }
@@ -115,7 +116,8 @@ class FiatSyncWorker {
                   description: tx.description,
                   metadata: tx.rawPayload,
                   completedAt: tx.timestamp,
-                  createdAt: tx.timestamp
+                  createdAt: tx.timestamp,
+                  accountId: tx.p2pAccountId,
                }
             });
             importedCount++;

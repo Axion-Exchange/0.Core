@@ -10,7 +10,7 @@ export class ReconciliationService {
    * Processes a Binance P2P Order History CSV.
    * Explodes masked users and prevents volume double counting.
    */
-  static async processCSV(filePath: string): Promise<any> {
+  static async processCSV(filePath: string, accountId?: string): Promise<any> {
     const results: any[] = [];
     const parser = fs.createReadStream(filePath).pipe(
       parse({
@@ -123,6 +123,7 @@ export class ReconciliationService {
                status,
                counterparty: counterpartyNickname,
                counterpartyName: counterpartyRealName,
+               accountId: accountId || null,
                createdAt: isNaN(createdAt.getTime()) ? new Date() : createdAt
              }
           });
