@@ -226,7 +226,8 @@ class BinanceSyncWorker {
       }
 
     } catch (err: any) {
-      log.error(`Binance sync iteration failed:`, err.message);
+      console.error(`!!! RAW BINANCE SYNC ERROR !!!`, err);
+      log.error(`Binance sync iteration failed:`, err?.stack || err);
     } finally {
       this.isRunning = false;
       // Run stale order reconciliation after sync (throttled to every 10th tick)
