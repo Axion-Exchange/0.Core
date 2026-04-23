@@ -105,58 +105,62 @@ class BinanceSyncWorker {
         let userNodeId: string | undefined = existingRecord?.userId || undefined;
 
         // Mathematically inject user aggregation precisely only on new distinct mutations safely
-        if (!existingRecord) {
-           const userNode = await prisma.user.upsert({
-             where: { externalId: counterpartyNickname },
-             create: {
-               externalId: counterpartyNickname,
-               displayName: counterpartyNameStr ? counterpartyNameStr : rawNickname,
-               legalName: counterpartyNameStr || null,
-               totalVolume: mappedStatus === OrderStatus.COMPLETED ? cryptoAmount : 0,
-               totalTrades: mappedStatus === OrderStatus.COMPLETED ? 1 : 0
-             },
-             update: {
-               ...(counterpartyNameStr ? { legalName: counterpartyNameStr, displayName: counterpartyNameStr } : {}),
-               ...(mappedStatus === OrderStatus.COMPLETED ? {
+        try {
+          if (!existingRecord) {
+             const userNode = await prisma.user.upsert({
+               where: { externalId: counterpartyNickname },
+               create: {
+                 externalId: counterpartyNickname,
+                 displayName: counterpartyNameStr ? counterpartyNameStr : rawNickname,
+                 legalName: counterpartyNameStr || null,
+                 totalVolume: mappedStatus === OrderStatus.COMPLETED ? cryptoAmount : 0,
+                 totalTrades: mappedStatus === OrderStatus.COMPLETED ? 1 : 0
+               },
+               update: {
+                 ...(counterpartyNameStr ? { legalName: counterpartyNameStr, displayName: counterpartyNameStr } : {}),
+                 ...(mappedStatus === OrderStatus.COMPLETED ? {
+                    totalVolume: { increment: cryptoAmount },
+                    totalTrades: { increment: 1 }
+                 } : {})
+               }
+            });
+            userNodeId = userNode.id;
+          } else if (mappedStatus === OrderStatus.COMPLETED && existingRecord.status !== OrderStatus.COMPLETED) {
+             const userNode = await prisma.user.upsert({
+               where: { externalId: counterpartyNickname },
+               create: {
+                 externalId: counterpartyNickname,
+                 displayName: counterpartyNameStr ? counterpartyNameStr : rawNickname,
+                 legalName: counterpartyNameStr || null,
+                 totalVolume: cryptoAmount,
+                 totalTrades: 1
+               },
+               update: {
+                  ...(counterpartyNameStr ? { legalName: counterpartyNameStr, displayName: counterpartyNameStr } : {}),
                   totalVolume: { increment: cryptoAmount },
                   totalTrades: { increment: 1 }
-               } : {})
-             }
-          });
-          userNodeId = userNode.id;
-        } else if (mappedStatus === OrderStatus.COMPLETED && existingRecord.status !== OrderStatus.COMPLETED) {
-           const userNode = await prisma.user.upsert({
-             where: { externalId: counterpartyNickname },
-             create: {
-               externalId: counterpartyNickname,
-               displayName: counterpartyNameStr ? counterpartyNameStr : rawNickname,
-               legalName: counterpartyNameStr || null,
-               totalVolume: cryptoAmount,
-               totalTrades: 1
-             },
-             update: {
-                ...(counterpartyNameStr ? { legalName: counterpartyNameStr, displayName: counterpartyNameStr } : {}),
-                totalVolume: { increment: cryptoAmount },
-                totalTrades: { increment: 1 }
-             }
-           });
-           userNodeId = userNode.id;
-        } else if (counterpartyNameStr && !existingRecord.counterpartyName) {
-           const userNode = await prisma.user.upsert({
-             where: { externalId: counterpartyNickname },
-             create: {
-               externalId: counterpartyNickname,
-               displayName: counterpartyNameStr,
-               legalName: counterpartyNameStr,
-               totalVolume: mappedStatus === OrderStatus.COMPLETED ? cryptoAmount : 0,
-               totalTrades: mappedStatus === OrderStatus.COMPLETED ? 1 : 0
-             },
-             update: { 
-               legalName: counterpartyNameStr,
-               displayName: counterpartyNameStr
-             }
-           });
-           userNodeId = userNode.id;
+               }
+             });
+             userNodeId = userNode.id;
+          } else if (counterpartyNameStr && !existingRecord.counterpartyName) {
+             const userNode = await prisma.user.upsert({
+               where: { externalId: counterpartyNickname },
+               create: {
+                 externalId: counterpartyNickname,
+                 displayName: counterpartyNameStr,
+                 legalName: counterpartyNameStr,
+                 totalVolume: mappedStatus === OrderStatus.COMPLETED ? cryptoAmount : 0,
+                 totalTrades: mappedStatus === OrderStatus.COMPLETED ? 1 : 0
+               },
+               update: { 
+                 legalName: counterpartyNameStr,
+                 displayName: counterpartyNameStr
+               }
+             });
+             userNodeId = userNode.id;
+          }
+        } catch (upsertError: any) {
+          logger.debug(`[BinanceSyncWorker] Concurrency skip on User Upsert for ${counterpartyNickname}: ${upsertError.message}`);
         }
 
         // Upsert into Database (ExternalOrderId enforces uniqueness)
