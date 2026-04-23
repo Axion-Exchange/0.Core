@@ -131,28 +131,38 @@ export class TreasuryService {
   /**
    * Update portfolio balance (called by sync jobs).
    */
-  async upsertPortfolio(currency: string, data: { totalBalance: number; availableBalance: number; lockedBalance?: number; pendingBalance?: number }) {
+  async upsertPortfolio(currency: string, data: { totalBalance: number; availableBalance: number; lockedBalance?: number; pendingBalance?: number }, accountId?: string) {
     // Doc ref: §Ledger Integrity (citations 9, 28, 29)
     // Advisory lock prevents concurrent portfolio mutations for the same currency.
-    return withAdvisoryLock(LOCK_NS.USER_BALANCE, `portfolio:${currency}`, async (tx) => {
-      return tx.portfolio.upsert({
-        where: { currency } as any,
-        create: {
-          currency,
-          totalBalance: data.totalBalance,
-          availableBalance: data.availableBalance,
-          lockedBalance: data.lockedBalance ?? 0,
-          pendingBalance: data.pendingBalance ?? 0,
-          lastSyncAt: new Date(),
-        },
-        update: {
-          totalBalance: data.totalBalance,
-          availableBalance: data.availableBalance,
-          lockedBalance: data.lockedBalance ?? 0,
-          pendingBalance: data.pendingBalance ?? 0,
-          lastSyncAt: new Date(),
-        },
+    return withAdvisoryLock(LOCK_NS.USER_BALANCE, `portfolio:${currency}:${accountId||'global'}`, async (tx) => {
+      const existing = await tx.portfolio.findFirst({
+        where: { currency, accountId: accountId || null }
       });
+
+      if (existing) {
+        return tx.portfolio.update({
+          where: { id: existing.id },
+          data: {
+            totalBalance: data.totalBalance,
+            availableBalance: data.availableBalance,
+            lockedBalance: data.lockedBalance ?? existing.lockedBalance,
+            pendingBalance: data.pendingBalance ?? existing.pendingBalance,
+            lastSyncAt: new Date(),
+          }
+        });
+      } else {
+        return tx.portfolio.create({
+          data: {
+            currency,
+            accountId: accountId || null,
+            totalBalance: data.totalBalance,
+            availableBalance: data.availableBalance,
+            lockedBalance: data.lockedBalance ?? 0,
+            pendingBalance: data.pendingBalance ?? 0,
+            lastSyncAt: new Date(),
+          }
+        });
+      }
     });
   }
 
