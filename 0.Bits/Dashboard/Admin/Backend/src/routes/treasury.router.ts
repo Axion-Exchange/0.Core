@@ -42,6 +42,14 @@ router.get('/balances-aggregated', async (req, res, next) => {
   } catch(err) { next(err); }
 });
 
+// GET /crypto-balances — For React Frontend Integration (Crypto Portfolio Page)
+router.get('/crypto-balances', async (req, res, next) => {
+  try {
+    const data = await treasuryService.getCryptoBalances();
+    sendSuccess(res, data);
+  } catch(err) { next(err); }
+});
+
 // GET /balances/history — Historical snapshots for charts
 router.get('/balances/history', validateQuery(balanceHistorySchema), async (req, res, next) => {
   try {
