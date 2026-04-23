@@ -48,8 +48,11 @@ export class DiditService {
       const apiKey = provider.apiKey;
       const url = `${provider.baseUrl.replace(/\/$/, '')}/session/`;
 
+      const metadata = provider.metadata as any;
+      const workflowId = metadata?.workflowId || "45c3e159-5a84-4781-9082-f8c66fee11fa";
+
       const payload = {
-        workflow_id: provider.appId,
+        workflow_id: workflowId,
         vendor_data: params.vendorData,
         callback: "https://api.0bit.app/v1/webhooks/didit", // Standardize callback if needed
         features: {
