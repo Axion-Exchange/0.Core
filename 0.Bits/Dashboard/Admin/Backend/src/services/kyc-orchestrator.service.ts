@@ -524,52 +524,31 @@ export class KycOrchestratorService {
    * Catches: manual approvals, expirations, declines done on Didit console.
    */
   async propagateStatusChanges(): Promise<{ updated: number; changes: { user: string; from: string; to: string }[] }> {
-    const matched = await prisma.kycSession.findMany({
-      where: { matchedUserId: { not: null } },
-      include: { matchedUser: { select: { id: true, legalName: true, kycStatus: true } } },
+    const matchedUsers = await prisma.user.findMany({
+      where: { kycSessions: { some: {} } },
+      select: { id: true, legalName: true, kycStatus: true }
     });
 
     let updated = 0;
     const changes: { user: string; from: string; to: string }[] = [];
 
-    for (const sess of matched) {
-      if (!sess.matchedUser) continue;
-      let sessionStatus = sess.status;
-      if (sess.rawPayload && typeof sess.rawPayload === 'object' && (sess.rawPayload as any).status) {
-        sessionStatus = (sess.rawPayload as any).status;
-      }
-      
-      const newStatus = this.mapStatus(sessionStatus);
-      const currentStatus = sess.matchedUser.kycStatus;
+    for (const user of matchedUsers) {
+      const unified = await this.getUnifiedStatus(user.id);
+      const newStatus = this.mapStatus(unified.status);
+      const currentStatus = user.kycStatus;
 
-      // Only propagate if status actually changed
       if (newStatus !== currentStatus) {
-        // Double check using the decision endpoint if going from APPROVED back to PENDING/IN_REVIEW
-        let finalStatus = newStatus;
-        if (currentStatus === 'APPROVED' && (newStatus === 'PENDING' || newStatus === 'IN_REVIEW')) {
-            try {
-              const decision = await diditService.getSessionDecision(sess.externalId);
-              if (decision && decision.status) {
-                 finalStatus = this.mapStatus(decision.status);
-              }
-            } catch (e) {
-              log.warn(`[Orchestrator] Failed to fetch decision for status check:`, e);
-            }
-        }
-        
-        if (finalStatus !== currentStatus) {
-          await prisma.user.update({
-            where: { id: sess.matchedUser.id },
-            data: { kycStatus: finalStatus },
-          });
-          updated++;
-          changes.push({
-            user: sess.matchedUser.legalName || sess.matchedUser.id,
-            from: currentStatus,
-            to: finalStatus,
-          });
-          log.info(`[Orchestrator] Status change: ${sess.matchedUser.legalName} ${currentStatus} → ${finalStatus}`);
-        }
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { kycStatus: newStatus },
+        });
+        updated++;
+        changes.push({
+          user: user.legalName || user.id,
+          from: currentStatus,
+          to: newStatus,
+        });
+        log.info(`[Orchestrator] Status change: ${user.legalName} ${currentStatus} → ${newStatus}`);
       }
     }
 

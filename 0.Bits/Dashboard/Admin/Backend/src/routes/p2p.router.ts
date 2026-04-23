@@ -31,6 +31,14 @@ router.post('/accounts', optionalAuth, validateBody(createAccountSchema), async 
   } catch (err) { next(err); }
 });
 
+router.get('/ads', optionalAuth, async (req, res, next) => {
+  try {
+    const result = await p2pService.listAds(req.query as any);
+    const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
+    sendPaginated(res, result.data, { ...meta, ...result.meta });
+  } catch (err) { next(err); }
+});
+
 router.use(requireAuth);
 
 router.put('/accounts/:id', requireAuth, validateParams(idParamSchema), async (req, res, next) => {
@@ -49,13 +57,7 @@ router.delete('/accounts/:id', requireAuth, validateParams(idParamSchema), async
 
 // ── Advertisements ───────────────────────────────────
 
-router.get('/ads', optionalAuth, async (req, res, next) => {
-  try {
-    const result = await p2pService.listAds(req.query as any);
-    const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
-    sendPaginated(res, result.data, { ...meta, ...result.meta });
-  } catch (err) { next(err); }
-});
+
 
 router.post('/ads', requireAuth, validateBody(createAdSchema), async (req, res, next) => {
   try {
