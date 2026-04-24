@@ -74,7 +74,8 @@ export class BinanceP2PConnector {
 
   async updateAdStatus(advNos: string[], advStatus: number): Promise<any> {
     const timestamp = Date.now();
-    const queryPayload = `timestamp=${timestamp}`;
+    const advNo = advNos[0]; // Binance expects a single string for this endpoint usually
+    const queryPayload = `advNo=${advNo}&advStatus=${advStatus}&timestamp=${timestamp}`;
     let signature: string;
 
     if (this.client.secret && (this.client.secret.includes('BEGIN PRIVATE KEY') || this.client.secret.includes('BEGIN RSA PRIVATE KEY'))) {
@@ -90,9 +91,8 @@ export class BinanceP2PConnector {
         method: 'POST',
         headers: {
           'X-MBX-APIKEY': this.client.apiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ advNos, advStatus })
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
     });
 
     return rawRes.json();
