@@ -39,6 +39,7 @@ export const QUEUE_NAMES = {
   BITGET_SPOT_SYNC: 'bitget-spot-sync',
   BINANCE_SPOT_MXN_SYNC: 'binance-spot-mxn-sync',
   CAPITAL_FLOW_SYNC: 'capital-flow-sync',
+  PNL_SYNC: 'pnl-sync',
 } as const;
 
 type QueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];
@@ -136,6 +137,7 @@ export async function registerRepeatableJobs(): Promise<void> {
     { queue: QUEUE_NAMES.BITGET_SPOT_SYNC, every: 600000, name: 'bitget-spot-tick' },
     { queue: QUEUE_NAMES.BINANCE_SPOT_MXN_SYNC,   every: 300000, name: 'binance-spot-mxn-tick' },
     { queue: QUEUE_NAMES.CAPITAL_FLOW_SYNC, every: 30000, name: 'capital-flow-sync-tick' },
+    { queue: QUEUE_NAMES.PNL_SYNC, every: 3600000, name: 'pnl-sync-tick' }, // Every hour
   ];
 
   for (const { queue, every, name } of schedules) {

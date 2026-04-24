@@ -109,6 +109,15 @@ createWorker(QUEUE_NAMES.BINANCE_SPOT_MXN_SYNC, async () => {
   await binanceSpotWorker.run();
 });
 
+// ── PnL Sync Worker ──────────────────────────────────────
+createWorker(QUEUE_NAMES.PNL_SYNC, async () => {
+  const { backfillPnlSnapshots } = await import("./services/pnl-snapshot.service.js");
+  // Backfill last 2 days to handle midnight crossovers safely
+  await backfillPnlSnapshots(2, "EUR");
+  await backfillPnlSnapshots(2, "COP");
+  await backfillPnlSnapshots(2, "MXN");
+});
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {
