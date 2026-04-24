@@ -81,7 +81,7 @@ class BinanceSyncWorker {
         let counterpartyNameStr = existingRecord?.counterpartyName;
 
         // Extract native Binance Legal Identities dynamically on missed records
-        if (!counterpartyNameStr && mappedStatus === OrderStatus.COMPLETED) {
+        if (!counterpartyNameStr) {
            const names = await binanceService.fetchTrueLegalName(order.orderNumber, account.id ? account : undefined);
            if (names) {
               // Priority map to the valid side
