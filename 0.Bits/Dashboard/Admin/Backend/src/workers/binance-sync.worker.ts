@@ -353,8 +353,8 @@ class BinanceSyncWorker {
       const staleIds = new Set(staleOrders.map((o: any) => o.externalOrderId).filter(Boolean));
       log.info(`Reconciling ${staleIds.size} stale pending orders...`);
 
-      // Fetch up to 5 pages of Binance history to find updated statuses
-      for (let page = 1; page <= 5; page++) {
+      // Fetch up to 50 pages of Binance history to find updated statuses
+      for (let page = 1; page <= 50; page++) {
         try {
           const response: any = await (binanceService as any).client.sapiGetC2cOrderMatchListUserOrderHistory({ page, rows: 100 });
           if (!response?.data?.length) break;
