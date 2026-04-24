@@ -174,8 +174,8 @@ export class P2PService {
   // ── Orders ─────────────────────────────────────────────
 
   async listOrders(filters?: { accountId?: string; status?: OrderStatus; asset?: string; type?: string; from?: Date; to?: Date; page?: number; limit?: number }) {
-    const page = filters?.page ?? 1;
-    const limit = filters?.limit ?? 25;
+    const page = parseInt(String(filters?.page ?? 1), 10) || 1;
+    const limit = parseInt(String(filters?.limit ?? 25), 10) || 25;
     const where: Prisma.P2POrderWhereInput = {};
 
     if (filters?.accountId) where.accountId = filters.accountId;
