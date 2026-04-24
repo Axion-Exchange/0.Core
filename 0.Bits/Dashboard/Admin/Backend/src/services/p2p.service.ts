@@ -192,6 +192,7 @@ export class P2PService {
       prisma.p2POrder.findMany({
         where,
         include: {
+          account: { select: { exchange: true, label: true } },
           advertisement: { select: { asset: true, fiat: true, type: true } },
           user: { select: { displayName: true } },
         },

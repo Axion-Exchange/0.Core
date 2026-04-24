@@ -39,6 +39,21 @@ router.get('/ads', optionalAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/orders', optionalAuth, async (req, res, next) => {
+  try {
+    const result = await p2pService.listOrders(req.query as any);
+    const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
+    sendPaginated(res, result.data, meta);
+  } catch (err) { next(err); }
+});
+
+router.get('/orders/:id', optionalAuth, validateParams(idParamSchema), async (req, res, next) => {
+  try {
+    const order = await p2pService.getOrder(param(req, 'id'));
+    sendSuccess(res, order);
+  } catch (err) { next(err); }
+});
+
 router.use(requireAuth);
 
 router.put('/accounts/:id', requireAuth, validateParams(idParamSchema), async (req, res, next) => {
@@ -80,22 +95,7 @@ router.put('/ads/:id/toggle', requireAuth, validateParams(idParamSchema), valida
   } catch (err) { next(err); }
 });
 
-// ── Orders ───────────────────────────────────────────
 
-router.get('/orders', optionalAuth, async (req, res, next) => {
-  try {
-    const result = await p2pService.listOrders(req.query as any);
-    const meta = buildPaginationMeta({ page: result.page, limit: result.limit, skip: 0 }, result.total);
-    sendPaginated(res, result.data, meta);
-  } catch (err) { next(err); }
-});
-
-router.get('/orders/:id', optionalAuth, validateParams(idParamSchema), async (req, res, next) => {
-  try {
-    const order = await p2pService.getOrder(param(req, 'id'));
-    sendSuccess(res, order);
-  } catch (err) { next(err); }
-});
 
 router.put('/orders/:id/release', requireAuth, validateParams(idParamSchema), async (req, res, next) => {
   try {
