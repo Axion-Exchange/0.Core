@@ -152,7 +152,10 @@ export class P2PService {
     if (ad.externalAdId && ad.account.exchange === 'BINANCE') {
        const success = await binanceService.toggleAdStatus(ad.externalAdId, enabled ? 'Active' : 'Paused', ad.account);
        if (!success) {
-         throw new Error(`Failed to toggle ad ${ad.externalAdId} on Binance`);
+         logger.warn(`Failed to toggle ad ${ad.externalAdId} on Binance. Updating local DB anyway.`);
+         // We log the warning but do not throw, allowing the local DB to update
+         // so the UI can reflect the user's intent. The sync worker will
+         // eventually pull the true status if it desyncs.
        }
     }
 

@@ -1,6 +1,3 @@
-import { spawn, ChildProcess } from 'child_process';
-import * as path from 'path';
-import * as fs from 'fs/promises';
 import { createLogger } from '../lib/logger.js';
 
 const log = createLogger('pear-manager-service');
@@ -9,68 +6,80 @@ export interface PearStatus {
   isRunning: boolean;
   pid: number | null;
   uptimeSeconds: number;
+  lastPing: Date | null;
 }
 
 export class PearManagerService {
-  private child: ChildProcess | null = null;
-  private readonly enginePath: string;
-  private startTime: number | null = null;
+  private readonly pearUrl: string;
+  private readonly apiKey: string;
+  private isOnline: boolean = false;
+  private lastPingTime: Date | null = null;
+  private pollingInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     // Determine the absolute path to the injected Python engine
-    this.enginePath = path.resolve(process.cwd(), 'p2p-engine');
+    this.pearUrl = process.env.PEAR_API_URL || 'http://localhost:8000';
+    this.apiKey = process.env.PEAR_API_SECRET_KEY || 'dev_secret_key';
+    
+    this.startHeartbeat();
   }
 
   /**
-   * Spawns the main.py python orchestrator if not already active.
+   * Health Check Monitor: Polls the FastAPI server to ensure it is alive.
+   * This replaces the old child_process PID check.
+   */
+  private startHeartbeat() {
+    this.pollingInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`${this.pearUrl}/`, {
+          headers: { 'Authorization': `Bearer ${this.apiKey}` },
+        });
+        
+        if (res.ok) {
+          this.isOnline = true;
+          this.lastPingTime = new Date();
+        } else {
+          this.isOnline = false;
+        }
+      } catch (err) {
+        this.isOnline = false;
+      }
+    }, 10000); // Check every 10 seconds
+  }
+
+  /**
+   * Sends an HTTP request to PearV2 to begin automation.
    */
   public async start(): Promise<void> {
-    if (this.child && !this.child.killed) {
-      log.warn('PearV2 is already running. Ignoring start command.');
-      return;
+    log.info('Sending boot command to PearV2 Daemon via HTTP...');
+    try {
+      const res = await fetch(`${this.pearUrl}/api/v1/control/start`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.apiKey}` }
+      });
+      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+      log.info('PearV2 started successfully.');
+    } catch (err: any) {
+      log.error('Failed to start PearV2 via HTTP', { error: err.message });
+      throw new Error(`Failed to contact PearV2 API: ${err.message}`);
     }
-
-    log.info(`Booting PearV2 Python Daemon from: ${this.enginePath}`);
-
-    // Adjusting spawn to hit main.py. Ensure your node environment has python3 installed.
-    // Recommended to use venv in production, but here we assume globally available python3.
-    this.child = spawn('python3', ['main.py'], {
-      cwd: this.enginePath,
-      env: { ...process.env, PYTHONPATH: this.enginePath }, // Pass current ENV downward
-      stdio: 'pipe',
-    });
-
-    this.startTime = Date.now();
-
-    this.child.stdout?.on('data', (data) => {
-      // Stream python stdout natively to backend logger
-      const output = data.toString().trim();
-      if (output) log.debug(`[PearV2] ${output}`);
-    });
-
-    this.child.stderr?.on('data', (data) => {
-      const output = data.toString().trim();
-      if (output) log.error(`[PearV2 ERR] ${output}`);
-    });
-
-    this.child.on('close', (code) => {
-      log.warn(`PearV2 python daemon exited with code ${code}`);
-      this.child = null;
-      this.startTime = null;
-    });
   }
 
   /**
-   * Gracefully kills the python daemon.
+   * Sends an HTTP request to PearV2 to stop automation safely.
    */
-  public stop(): void {
-    if (this.child && !this.child.killed) {
-      log.info('Executing shutdown sequence on PearV2 Daemon...');
-      this.child.kill('SIGTERM');
-      this.child = null;
-      this.startTime = null;
-    } else {
-      log.info('PearV2 is not running.');
+  public async stop(): Promise<void> {
+    log.info('Executing shutdown sequence on PearV2 Daemon via HTTP...');
+    try {
+      const res = await fetch(`${this.pearUrl}/api/v1/control/stop`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.apiKey}` }
+      });
+      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+      log.info('PearV2 stopped successfully.');
+    } catch (err: any) {
+      log.error('Failed to stop PearV2 via HTTP', { error: err.message });
+      throw new Error(`Failed to contact PearV2 API: ${err.message}`);
     }
   }
 
@@ -78,59 +87,33 @@ export class PearManagerService {
    * Status reporter for frontend orchestration.
    */
   public getStatus(): PearStatus {
-    const isRunning = this.child !== null && !this.child.killed;
     return {
-      isRunning,
-      pid: isRunning ? this.child!.pid || null : null,
-      uptimeSeconds: isRunning && this.startTime ? Math.floor((Date.now() - this.startTime) / 1000) : 0,
+      isRunning: this.isOnline,
+      pid: null, // PID is no longer tracked natively in microservice pattern
+      uptimeSeconds: 0, // This would optimally be fetched from the health check payload
+      lastPing: this.lastPingTime
     };
   }
 
   /**
-   * Overwrites the python .env natively for configuration.
-   * This bridges the Node Dashboard to the Python memory.
+   * Overwrites the python .env remotely via the FastAPI config endpoint.
    */
   public async updateConfig(configs: Record<string, string>): Promise<void> {
-    const envPath = path.join(this.enginePath, '.env');
-    let currentEnv = '';
-
+    log.info('Sending config updates to PearV2 via HTTP...');
     try {
-      currentEnv = await fs.readFile(envPath, 'utf8');
-    } catch (e: any) {
-      // File doesn't exist, ignore and create fresh
-      if (e.code !== 'ENOENT') {
-        log.error('Failed to read python .env', { error: e });
-        throw new Error('Failed to read python .env');
-      }
-    }
-
-    // Process old lines and update matching configs
-    const lines = currentEnv.split('\n');
-    const updatedKeys = new Set<string>();
-    
-    const newLines = lines.map(line => {
-      const [key] = line.split('=');
-      const trimmedKey = key?.trim();
-      if (trimmedKey && configs[trimmedKey] !== undefined) {
-        updatedKeys.add(trimmedKey);
-        return `${trimmedKey}="${configs[trimmedKey]}"`;
-      }
-      return line;
-    });
-
-    // Append new configs not found in previous .env
-    for (const [key, val] of Object.entries(configs)) {
-      if (!updatedKeys.has(key)) {
-        newLines.push(`${key}="${val}"`);
-      }
-    }
-
-    try {
-      await fs.writeFile(envPath, newLines.join('\n'), 'utf8');
-      log.info(`Updated PearV2 configuration mapping internally.`);
-    } catch (e) {
-      log.error('Failed to write updated python .env', { error: e });
-      throw new Error('Failed to overwrite .env');
+      const res = await fetch(`${this.pearUrl}/api/v1/config`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ config: configs })
+      });
+      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+      log.info(`Updated PearV2 configuration mapping remotely.`);
+    } catch (err: any) {
+      log.error('Failed to write updated python .env remotely', { error: err.message });
+      throw new Error('Failed to overwrite .env remotely');
     }
   }
 }
