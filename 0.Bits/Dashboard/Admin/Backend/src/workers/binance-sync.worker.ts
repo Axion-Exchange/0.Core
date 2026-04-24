@@ -341,16 +341,20 @@ class BinanceSyncWorker {
       // Find orders in non-terminal states older than 1 hour
       const staleOrders = await prisma.p2POrder.findMany({
         where: {
-          status: { in: ['PENDING_FIAT', 'FIAT_RECEIVED', 'PENDING_RELEASE'] },
+          OR: [
+            { status: { in: ['PENDING_FIAT', 'FIAT_RECEIVED', 'PENDING_RELEASE'] } },
+            { counterpartyName: null }
+          ],
           createdAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
         },
-        select: { externalOrderId: true },
+        select: { externalOrderId: true, counterpartyName: true },
         take: 200,
       });
 
       if (staleOrders.length === 0) return;
 
       const staleIds = new Set(staleOrders.map((o: any) => o.externalOrderId).filter(Boolean));
+      const missingNameIds = new Set(staleOrders.filter((o: any) => !o.counterpartyName).map((o: any) => o.externalOrderId).filter(Boolean));
       log.info(`Reconciling ${staleIds.size} stale pending orders...`);
 
       // Fetch up to 50 pages of Binance history to find updated statuses
@@ -376,6 +380,26 @@ class BinanceSyncWorker {
               });
               staleIds.delete(order.orderNumber);
               log.info(`Reconciled ${order.orderNumber} → ${newStatus}`);
+            }
+
+            // Bulletproof fail-safe: Also fetch missing true legal names if they slipped through
+            if (missingNameIds.has(order.orderNumber)) {
+              try {
+                const names = await binanceService.fetchTrueLegalName(order.orderNumber);
+                if (names) {
+                  const trueName = order.tradeType === 'BUY' ? names.sellerName : names.buyerName;
+                  if (trueName) {
+                    await prisma.p2POrder.update({
+                      where: { externalOrderId: order.orderNumber },
+                      data: { counterpartyName: trueName, counterparty: trueName }
+                    });
+                    missingNameIds.delete(order.orderNumber);
+                    log.info(`[Failsafe] Recovered missing true name for stale order ${order.orderNumber}: ${trueName}`);
+                  }
+                }
+              } catch (err: any) {
+                log.warn(`[Failsafe] Could not fetch missing true name for ${order.orderNumber}: ${err.message}`);
+              }
             }
           }
 
