@@ -179,7 +179,14 @@ export class P2PService {
     const where: Prisma.P2POrderWhereInput = {};
 
     if (filters?.accountId) where.accountId = filters.accountId;
-    if (filters?.status) where.status = filters.status;
+    if (filters?.status) {
+      const statusStr = String(filters.status);
+      if (statusStr.includes(',')) {
+        where.status = { in: statusStr.split(',') as OrderStatus[] };
+      } else {
+        where.status = statusStr as OrderStatus;
+      }
+    }
     if (filters?.asset) where.asset = filters.asset;
     if (filters?.type) where.type = filters.type as any;
     if (filters?.from || filters?.to) {
