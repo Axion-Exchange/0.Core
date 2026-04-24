@@ -134,10 +134,18 @@ export class P2PService {
   }
 
   async toggleAd(id: string, enabled: boolean) {
-    const ad = await prisma.p2PAdvertisement.findUnique({
+    let ad = await prisma.p2PAdvertisement.findUnique({
       where: { id },
       include: { account: true }
     });
+
+    // Fallback: try lookup by externalAdId (Binance ad number)
+    if (!ad) {
+      ad = await prisma.p2PAdvertisement.findFirst({
+        where: { externalAdId: id },
+        include: { account: true }
+      });
+    }
 
     if (!ad) throw new NotFoundError('Advertisement', id);
 
