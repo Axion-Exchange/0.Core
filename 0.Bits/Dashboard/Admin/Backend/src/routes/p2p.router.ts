@@ -54,6 +54,13 @@ router.get('/orders/:id', optionalAuth, validateParams(idParamSchema), async (re
   } catch (err) { next(err); }
 });
 
+router.put('/ads/:id/toggle', optionalAuth, validateParams(idParamSchema), validateBody(toggleAdSchema), async (req, res, next) => {
+  try {
+    const ad = await p2pService.toggleAd(param(req, 'id'), req.body.enabled);
+    sendSuccess(res, ad);
+  } catch (err) { next(err); }
+});
+
 router.use(requireAuth);
 
 router.put('/accounts/:id', requireAuth, validateParams(idParamSchema), async (req, res, next) => {
@@ -88,12 +95,7 @@ router.put('/ads/:id', requireAuth, validateParams(idParamSchema), validateBody(
   } catch (err) { next(err); }
 });
 
-router.put('/ads/:id/toggle', requireAuth, validateParams(idParamSchema), validateBody(toggleAdSchema), async (req, res, next) => {
-  try {
-    const ad = await p2pService.toggleAd(param(req, 'id'), req.body.enabled);
-    sendSuccess(res, ad);
-  } catch (err) { next(err); }
-});
+
 
 
 
