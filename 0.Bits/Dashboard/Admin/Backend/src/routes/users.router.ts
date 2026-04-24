@@ -252,10 +252,10 @@ router.post('/export-data', async (req, res, next) => {
 
       const folderName = `${(user.displayName || user.legalName || 'User').replace(/[^a-zA-Z0-9]/g, '_')}_${user.id.substring(0,8)}`;
 
-      if (options.transactions && user.transactions.length > 0) {
-        let csv = 'ID,Date,Amount,Currency,Type,Status\n';
-        for (const tx of user.transactions) {
-          csv += `${tx.id},${tx.createdAt.toISOString()},${tx.amount},${tx.currency},${tx.type},${tx.status}\n`;
+      if (options.transactions && user.orders.length > 0) {
+        let csv = 'ID,External_ID,Date,Amount,Asset,Fiat_Amount,Fiat,Type,Status\n';
+        for (const order of user.orders) {
+          csv += `${order.id},${order.externalOrderId || ''},${order.createdAt.toISOString()},${order.amount},${order.asset},${order.fiatAmount},${order.fiat},${order.type},${order.status}\n`;
         }
         archive.append(csv, { name: `${folderName}/transactions.csv` });
       }
