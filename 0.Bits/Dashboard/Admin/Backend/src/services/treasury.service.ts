@@ -349,7 +349,7 @@ export class TreasuryService {
     let totalUsd = 0; // Strictly speaking, we assume USDT=1 USD here, and perhaps fetch live rates for BTC/ETH if requested later
 
     for (const [asset, data] of assets) {
-      const totalAsset = data.available + data.locked + data.pendingBuys;
+      const totalAsset = data.available + data.pendingBuys;
 
       let usdValue = totalAsset; 
       // Very basic mock price conversion for UI showcase if not strictly USDT
@@ -363,13 +363,13 @@ export class TreasuryService {
         balance: totalAsset.toLocaleString(undefined, { maximumFractionDigits: 4 }),
         usdValue,
         available: data.available,
-        locked: data.locked,
+        locked: data.pendingBuys,
         pendingBuys: data.pendingBuys
       });
     }
     
     for (const [key, data] of accountDetailsMap) {
-      const totalAsset = data.available + data.locked + data.pendingBuys;
+      const totalAsset = data.available + data.pendingBuys;
       
       let usdValue = totalAsset;
       if (data.asset === "BTC") usdValue *= 95000;
@@ -383,7 +383,7 @@ export class TreasuryService {
         balanceFormatted: totalAsset.toLocaleString(undefined, { maximumFractionDigits: 4 }),
         usdValue,
         available: data.available,
-        locked: data.locked,
+        locked: data.pendingBuys,
         pendingBuys: data.pendingBuys
       });
     }
