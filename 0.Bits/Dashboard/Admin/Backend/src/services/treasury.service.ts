@@ -180,6 +180,21 @@ export class TreasuryService {
     });
   }
 
+  async getLiveExchangeRates() {
+    try {
+      const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=%5B%22EURUSDT%22,%22USDTCOP%22,%22USDTMXN%22%5D');
+      const data = await res.json();
+      const rates: Record<string, number> = {};
+      for (const item of data) {
+        rates[item.symbol] = parseFloat(item.price);
+      }
+      return rates;
+    } catch(e: any) {
+      log.error('Failed to fetch exchange rates', e.message);
+      return {};
+    }
+  }
+
   /**
    * Institutional Aggregated Balances — Uses balance_ledger for correct
    * available + pending totals, and real historical snapshots for charts.
@@ -269,11 +284,38 @@ export class TreasuryService {
       if (chartData.length === 0) chartData.push(singlePoint);
     }
 
-    // Total across all accounts
-    const totalValue = latestBalances.reduce((acc: number, b: any) => acc + (b.total || 0), 0);
+    // Fetch live rates for portfolio total calculation
+    const rates = await this.getLiveExchangeRates();
+    const eurusdt = rates['EURUSDT'] || 1.05;
+    const usdtcop = rates['USDTCOP'] || 4000;
+    const usdtmxn = rates['USDTMXN'] || 17.5;
+
+    // Total across all fiat accounts converted to EUR
+    let totalValueEur = 0;
+    for (const b of latestBalances) {
+      const total = b.total || 0;
+      if (b.currency === 'EUR') {
+        totalValueEur += total;
+      } else if (b.currency === 'COP') {
+        const usdt = total / usdtcop;
+        totalValueEur += (usdt / eurusdt);
+      } else if (b.currency === 'MXN') {
+        const usdt = total / usdtmxn;
+        totalValueEur += (usdt / eurusdt);
+      } else if (b.currency === 'USD' || b.currency === 'USDT') {
+        totalValueEur += (total / eurusdt);
+      }
+    }
+
+    // Add total Crypto converted to EUR
+    try {
+      const crypto = await this.getCryptoBalances();
+      totalValueEur += (crypto.totalUsd / eurusdt);
+    } catch(e) {}
 
     return {
-      totalUsd: totalValue,
+      totalUsd: totalValueEur, // Keeping key as totalUsd for frontend compat, though it's EUR
+
       summary: summaryBuckets,
       chartData,
       categories,
