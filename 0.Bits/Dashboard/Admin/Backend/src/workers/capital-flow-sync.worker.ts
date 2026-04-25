@@ -143,19 +143,45 @@ export class CapitalFlowSyncWorker {
           // 5. Account Balances Snapshot (Funding Wallet)
           try {
             const fundingBalances = await binanceService.fetchFundingBalances(account);
-            for (const b of fundingBalances) {
-              await prisma.balanceLedger.create({
-                data: {
-                  accountId: account.id,
-                  source: 'binance_funding',
-                  currency: b.currency,
-                  balance: b.available,
-                  pending: b.locked,
-                  metadata: { provider: 'binance', accountLabel: account.label }
-                }
+            if (fundingBalances && fundingBalances.length > 0) {
+              for (const b of fundingBalances) {
+                await prisma.balanceLedger.create({
+                  data: {
+                    accountId: account.id,
+                    source: 'binance_funding',
+                    currency: b.currency,
+                    available: b.available,
+                    pending: b.locked,
+                    metadata: { provider: 'binance', accountLabel: account.label }
+                  }
+                });
+              }
+              log.info(`[CapitalFlowWorker] Snapshotted ${fundingBalances.length} balances for ${account.label}`);
+            } else {
+              log.warn(`[CapitalFlowWorker] Received 0 balances for ${account.label}. Engaging Defensive State Carryover.`);
+              const lastSnapshot = await prisma.balanceLedger.findFirst({
+                where: { accountId: account.id, source: 'binance_funding' },
+                orderBy: { snapshotAt: 'desc' }
               });
+              if (lastSnapshot) {
+                await prisma.balanceLedger.create({
+                  data: {
+                    accountId: lastSnapshot.accountId,
+                    source: lastSnapshot.source,
+                    currency: lastSnapshot.currency,
+                    available: lastSnapshot.available,
+                    pending: lastSnapshot.pending,
+                    metadata: { 
+                      provider: 'binance', 
+                      accountLabel: account.label,
+                      state: 'STALE', 
+                      reason: 'API_FAILURE' 
+                    }
+                  }
+                });
+                log.info(`[CapitalFlowWorker] Carried over STALE balance for ${account.label}`);
+              }
             }
-            log.info(`[CapitalFlowWorker] Snapshotted ${fundingBalances.length} balances for ${account.label}`);
           } catch(err: any) {
             log.error(`[CapitalFlowWorker] Failed to snapshot balances for ${account.label}: ${err.message}`);
           }

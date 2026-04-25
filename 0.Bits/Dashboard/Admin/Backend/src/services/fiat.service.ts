@@ -345,6 +345,18 @@ export class FiatService {
       where: { fiatIntegrationData: { not: Prisma.AnyNull } }
     });
 
+    if (accounts.length === 0) {
+      log.info('[FiatService] No explicitly mapped P2P accounts found. Falling back to Master Treasury Sync.');
+      if (this.januar.enabled) {
+        const januarBal = await this.januar.getBalance();
+        if (januarBal) balances.push(januarBal);
+      }
+      if (this.facilitaPay.enabled) {
+        balances.push(...await this.facilitaPay.getBalances());
+      }
+      return balances;
+    }
+
     for (const account of accounts) {
       const fiatData = account.fiatIntegrationData as any;
       if (!fiatData) continue;
@@ -429,6 +441,15 @@ export class FiatService {
     const accounts = await prisma.p2PAccount.findMany({
       where: { fiatIntegrationData: { not: Prisma.AnyNull } }
     });
+
+    if (accounts.length === 0) {
+      log.info('[FiatService] No explicitly mapped P2P accounts found. Falling back to Master Treasury Tx Sync.');
+      if (this.januar.enabled) {
+        const januarTxs = await this.januar.getTransactions();
+        allTxs.push(...januarTxs);
+      }
+      return allTxs;
+    }
 
     for (const account of accounts) {
       const fiatData = account.fiatIntegrationData as any;
