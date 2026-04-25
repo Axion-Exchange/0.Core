@@ -183,14 +183,14 @@ export class TreasuryService {
   async getLiveExchangeRates() {
     try {
       const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=%5B%22EURUSDT%22,%22USDTCOP%22,%22USDTMXN%22%5D');
-      const data = await res.json();
+      const data: any = await res.json();
       const rates: Record<string, number> = {};
       for (const item of data) {
         rates[item.symbol] = parseFloat(item.price);
       }
       return rates;
     } catch(e: any) {
-      log.error('Failed to fetch exchange rates', e.message);
+      console.error('Failed to fetch exchange rates', e.message);
       return {};
     }
   }
