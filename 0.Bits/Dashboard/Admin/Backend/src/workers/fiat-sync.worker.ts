@@ -82,6 +82,14 @@ class FiatSyncWorker {
         });
         const pendingAmount = Number(escrowAgg._sum.fiatAmount || 0);
 
+        let p2pAccountId: string | null = null;
+        if (bal.accountId) {
+          const accountExists = await prisma.p2PAccount.findUnique({ where: { id: bal.accountId } }).catch(() => null);
+          if (accountExists) {
+            p2pAccountId = bal.accountId;
+          }
+        }
+
         await prisma.balanceLedger.create({
           data: {
             source: bal.provider,
@@ -90,7 +98,7 @@ class FiatSyncWorker {
             pending: pendingAmount,
             metadata: { rawBalance: bal.balance, provider: bal.provider },
             snapshotAt: new Date(),
-            accountId: bal.accountId,
+            accountId: p2pAccountId,
           }
         });
       }
