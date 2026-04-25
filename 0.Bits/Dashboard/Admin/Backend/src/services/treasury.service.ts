@@ -194,9 +194,10 @@ export class TreasuryService {
         (available + pending)::float as total,
         "snapshotAt"
       FROM balance_ledger
+      WHERE source != 'binance_funding'
     `;
     if (accountId) {
-      query += ` WHERE "accountId" = '${accountId}'`;
+      query += ` AND "accountId" = '${accountId}'`;
     }
     query += ` ORDER BY source, currency, "snapshotAt" DESC`;
 
@@ -235,6 +236,7 @@ export class TreasuryService {
         AVG((available + pending)::float) as avg_total
       FROM balance_ledger
       WHERE "snapshotAt" >= NOW() - INTERVAL '30 days'
+        AND source != 'binance_funding'
       GROUP BY "snapshotAt"::date, source, currency
       ORDER BY day ASC
     `);
