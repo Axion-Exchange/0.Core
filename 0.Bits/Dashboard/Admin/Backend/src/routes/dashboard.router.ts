@@ -80,16 +80,38 @@ router.get("/pnl-daily", async (req, res, next) => {
     const days = parseInt((req.query.days as string) || "180", 10);
     const snapshots = await getPnlTimeSeries(currency, days, req.query.accountId as string);
     
-    // Map to chart-friendly format
-    const chartData = snapshots.map((s: any) => ({
-      date: new Date(s.date).toISOString().split("T")[0],
-      pnl: Number(s.realizedPnl),
-      buyVolume: Number(s.buyVolume),
-      sellVolume: Number(s.sellVolume),
-      spread: Number(s.spreadPct),
-      buyCount: s.buyCount,
-      sellCount: s.sellCount,
-    }));
+    // Aggregate snapshots by date to prevent duplicate bars per day (e.g., from multiple accounts)
+    const aggregated = new Map<string, any>();
+    
+    for (const s of snapshots) {
+      const dateStr = new Date(s.date).toISOString().split("T")[0];
+      
+      if (!aggregated.has(dateStr)) {
+        aggregated.set(dateStr, {
+          date: dateStr,
+          pnl: 0,
+          buyVolume: 0,
+          sellVolume: 0,
+          spread: 0,
+          buyCount: 0,
+          sellCount: 0,
+        });
+      }
+      
+      const agg = aggregated.get(dateStr);
+      agg.pnl += Number(s.realizedPnl || 0);
+      agg.buyVolume += Number(s.buyVolume || 0);
+      agg.sellVolume += Number(s.sellVolume || 0);
+      agg.buyCount += Number(s.buyCount || 0);
+      agg.sellCount += Number(s.sellCount || 0);
+      
+      // Rough spread approximation for the aggregated total
+      if (agg.buyVolume > 0) {
+        agg.spread = (agg.pnl / agg.buyVolume) * 100;
+      }
+    }
+    
+    const chartData = Array.from(aggregated.values()).sort((a, b) => a.date.localeCompare(b.date));
     
     res.json({ success: true, data: chartData });
   } catch (err) { next(err); }
