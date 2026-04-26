@@ -84,7 +84,7 @@ router.get("/pnl-daily", async (req, res, next) => {
     const aggregated = new Map<string, any>();
     
     for (const s of snapshots) {
-      const dateStr = new Date(s.date).toISOString().split("T")[0];
+      const dateStr = new Date(s.date).toISOString().split("T")[0] as string;
       
       if (!aggregated.has(dateStr)) {
         aggregated.set(dateStr, {
